@@ -1,5 +1,46 @@
 #pragma once
 
+enum Endianess
+{
+	LITTLE_ENDIAN = 1,
+	BIG_ENDIAN = 0,
+};
+
+//Sets endianess of packaged/received data
+//0 is network byte order(big endian)
+//1 is little endian
+#define ENDIANESS_OUTPUT LITTLE_ENDIAN
+#define ENDIANESS_INPUT LITTLE_ENDIAN
+
+//True if the current system is big endian
+#define IS_BIG_ENDIAN (!*(unsigned char *)&(unsigned __int16){1})
+
+#define Swap16(data) \
+( (((data) >> 8) & 0x00FF) | (((data) << 8) & 0xFF00) ) 
+
+#define Swap32(data)   \
+( (((data) >> 24) & 0x000000FF) | (((data) >>  8) & 0x0000FF00) | \
+  (((data) <<  8) & 0x00FF0000) | (((data) << 24) & 0xFF000000) ) 
+
+//Converts host long to ENDIANESS_OUTPUT endianess.
+u_long htool(u_long hlong);
+
+//Converts host short to ENDIANESS_OUTPUT endianess.
+u_short htoos(u_short hshort);
+
+//Converts host float to ENDIANESS_OUTPUT endianess.
+float htoof(float value);
+
+//Converts ENDIANESS_INPUT endianess long to host endianess.
+u_long itohl(u_long ilong);
+
+//Converts ENDIANESS_INPUT endianess short to host endianess.
+u_short itohs(u_short ishort);
+
+//Converts ENDIANESS_INPUT endianess float to host endianess.
+float itohf(float value);
+
+
 //Data IDs
 /*The following are data IDs used in the communication between the
 host and the remote DCS. GET IDs are for the data from the DCS*/

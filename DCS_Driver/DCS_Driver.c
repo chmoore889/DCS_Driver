@@ -36,7 +36,7 @@ int Receive_DCS_Status(char* pDataBuf) {
 	memcpy(&DCS_Cha_Num, &pDataBuf[2], sizeof(DCS_Cha_Num));
 
 	//Change from network to host byte order
-	DCS_Cha_Num = ntohl(DCS_Cha_Num);
+	DCS_Cha_Num = itohl(DCS_Cha_Num);
 
 	Get_DCS_Status_CB(bCorr, bAnalyzer, DCS_Cha_Num);
 
@@ -72,13 +72,13 @@ int Send_Correlator_Setting(Correlator_Setting_Type* pCorrelator_Setting) {
 	}
 
 	//Copy struct into data buffer and change to network byte order
-	int Data_N = htonl(pCorrelator_Setting->Data_N);
+	int Data_N = htool(pCorrelator_Setting->Data_N);
 	memcpy(&pDataBuf[0], &Data_N, sizeof(Data_N));
 
-	int Scale = htonl(pCorrelator_Setting->Scale);
+	int Scale = htool(pCorrelator_Setting->Scale);
 	memcpy(&pDataBuf[4], &Scale, sizeof(Scale));
 
-	int SampleSize = htonl((int)ceil(pCorrelator_Setting->Corr_Time / pCorrelator_Setting->Data_N / 200e-9));
+	int SampleSize = htool((int)ceil(pCorrelator_Setting->Corr_Time / pCorrelator_Setting->Data_N / 200e-9));
 	memcpy(&pDataBuf[8], &SampleSize, sizeof(SampleSize));
 
 	int result = Send_DCS_Command(SET_CORRELATOR_SETTING, pDataBuf, BufferSize);
@@ -109,9 +109,9 @@ int Receive_Correlator_Setting(char* pDataBuf) {
 	memcpy(&Sample_Size, &pDataBuf[8], sizeof(Sample_Size));
 
 	//Change network endianess to host
-	Data_N = ntohl(Data_N);
-	Scale = ntohl(Scale);
-	Sample_Size = ntohl(Sample_Size);
+	Data_N = itohl(Data_N);
+	Scale = itohl(Scale);
+	Sample_Size = itohl(Sample_Size);
 
 	memcpy(&pCorrelator_Setting->Data_N, &Data_N, sizeof(Data_N));
 	memcpy(&pCorrelator_Setting->Scale, &Scale, sizeof(Scale));
@@ -140,7 +140,7 @@ int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num)
 	}
 
 #pragma warning (disable: 6386 6385)
-	int network_Cha_Num = htonl(Cha_Num);
+	int network_Cha_Num = htool(Cha_Num);
 	memcpy(&pDataBuf[0], &network_Cha_Num, sizeof(Cha_Num));
 
 	//Change analyzer settings to network byte order
@@ -151,26 +151,13 @@ int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num)
 	}
 
 	for (int x = 0; x < Cha_Num; x++) {
-		unsigned int net_Alpha = htonf(pAnalyzer_Setting[x].Alpha);
-		memcpy(&network_Analyzer[x].Alpha, &net_Alpha, sizeof(net_Alpha));
-
-		unsigned int net_Beta = htonf(pAnalyzer_Setting[x].Beta);
-		memcpy(&network_Analyzer[x].Beta, &net_Beta, sizeof(net_Beta));
-
-		unsigned int net_Db = htonf(pAnalyzer_Setting[x].Db);
-		memcpy(&network_Analyzer[x].Db, &net_Db, sizeof(net_Db));
-
-		unsigned int net_Distance = htonf(pAnalyzer_Setting[x].Distance);
-		memcpy(&network_Analyzer[x].Distance, &net_Distance, sizeof(net_Distance));
-
-		unsigned int net_mua0 = htonf(pAnalyzer_Setting[x].mua0);
-		memcpy(&network_Analyzer[x].mua0, &net_mua0, sizeof(net_mua0));
-
-		unsigned int net_musp = htonf(pAnalyzer_Setting[x].musp);
-		memcpy(&network_Analyzer[x].musp, &net_musp, sizeof(net_musp));
-
-		unsigned int net_Wavelength = htonf(pAnalyzer_Setting[x].Wavelength);
-		memcpy(&network_Analyzer[x].Wavelength, &net_Wavelength, sizeof(net_Wavelength));
+		network_Analyzer[x].Alpha = htoof(pAnalyzer_Setting[x].Alpha);
+		network_Analyzer[x].Beta = htoof(pAnalyzer_Setting[x].Beta);
+		network_Analyzer[x].Db = htoof(pAnalyzer_Setting[x].Db);
+		network_Analyzer[x].Distance = htoof(pAnalyzer_Setting[x].Distance);
+		network_Analyzer[x].mua0 = htoof(pAnalyzer_Setting[x].mua0);
+		network_Analyzer[x].musp = htoof(pAnalyzer_Setting[x].musp);
+		network_Analyzer[x].Wavelength = htoof(pAnalyzer_Setting[x].Wavelength);
 	}
 
 	memcpy(&pDataBuf[4], network_Analyzer, Cha_Num * sizeof(*network_Analyzer));
@@ -196,7 +183,7 @@ int Receive_Analyzer_Setting(char* pDataBuf) {
 	int Cha_Num;
 
 	memcpy(&Cha_Num, &pDataBuf[0], sizeof(Cha_Num));
-	Cha_Num = ntohl(Cha_Num);
+	Cha_Num = itohl(Cha_Num);
 
 	pAnalyzer_Setting = malloc(Cha_Num * sizeof(*pAnalyzer_Setting));
 	if (pAnalyzer_Setting == NULL) {
@@ -208,13 +195,13 @@ int Receive_Analyzer_Setting(char* pDataBuf) {
 		memcpy(&pAnalyzer_Setting[x], &pDataBuf[sizeof(Cha_Num) + x * sizeof(*pAnalyzer_Setting)], sizeof(*pAnalyzer_Setting));
 
 		//Change network endianess to host
-		pAnalyzer_Setting[x].Alpha = ntohf(*(unsigned int*)& pAnalyzer_Setting[x].Alpha);
-		pAnalyzer_Setting[x].Beta = ntohf(*(unsigned int*)& pAnalyzer_Setting[x].Beta);
-		pAnalyzer_Setting[x].Db = ntohf(*(unsigned int*)& pAnalyzer_Setting[x].Db);
-		pAnalyzer_Setting[x].Distance = ntohf(*(unsigned int*)& pAnalyzer_Setting[x].Distance);
-		pAnalyzer_Setting[x].mua0 = ntohf(*(unsigned int*)& pAnalyzer_Setting[x].mua0);
-		pAnalyzer_Setting[x].musp = ntohf(*(unsigned int*)& pAnalyzer_Setting[x].musp);
-		pAnalyzer_Setting[x].Wavelength = ntohf(*(unsigned int*)& pAnalyzer_Setting[x].Wavelength);
+		pAnalyzer_Setting[x].Alpha = itohf(pAnalyzer_Setting[x].Alpha);
+		pAnalyzer_Setting[x].Beta = itohf(pAnalyzer_Setting[x].Beta);
+		pAnalyzer_Setting[x].Db = itohf(pAnalyzer_Setting[x].Db);
+		pAnalyzer_Setting[x].Distance = itohf(pAnalyzer_Setting[x].Distance);
+		pAnalyzer_Setting[x].mua0 = itohf(pAnalyzer_Setting[x].mua0);
+		pAnalyzer_Setting[x].musp = itohf(pAnalyzer_Setting[x].musp);
+		pAnalyzer_Setting[x].Wavelength = itohf(pAnalyzer_Setting[x].Wavelength);
 	}
 #pragma warning (default: 6386 6385)
 
@@ -238,10 +225,10 @@ int Send_Start_Measurement(int Interval, int* pCha_IDs, int Cha_Num) {
 	}
 
 #pragma warning (disable: 6386)
-	int network_Interval = htonl(Interval);
+	int network_Interval = htool(Interval);
 	memcpy(&pDataBuf[0], &network_Interval, sizeof(network_Interval));
 
-	int network_Cha_Num = htonl(Cha_Num);
+	int network_Cha_Num = htool(Cha_Num);
 	memcpy(&pDataBuf[4], &network_Cha_Num, sizeof(network_Cha_Num));
 
 	int* network_Cha_IDs = malloc(Cha_Num * sizeof(*network_Cha_IDs));
@@ -252,7 +239,7 @@ int Send_Start_Measurement(int Interval, int* pCha_IDs, int Cha_Num) {
 
 	memcpy(network_Cha_IDs, pCha_IDs, Cha_Num * sizeof(*network_Cha_IDs));
 	for (int x = 0; x < Cha_Num; x++) {
-		network_Cha_IDs[x] = htonl(network_Cha_IDs[x]);
+		network_Cha_IDs[x] = htool(network_Cha_IDs[x]);
 	}
 	memcpy(&pDataBuf[8], network_Cha_IDs, Cha_Num * sizeof(*pCha_IDs));
 #pragma warning (default: 6386)
@@ -310,9 +297,9 @@ int Receive_Simulated_Correlation(char* pDataBuf) {
 	memcpy(&Simulated_Corr.Data_Num, &pDataBuf[8], sizeof(Simulated_Corr.Data_Num));
 
 	//Change first three values from network to host endianess
-	Simulated_Corr.Precut = ntohl(Simulated_Corr.Precut);
-	Simulated_Corr.Cha_ID = ntohl(Simulated_Corr.Cha_ID);
-	Simulated_Corr.Data_Num = ntohl(Simulated_Corr.Data_Num);
+	Simulated_Corr.Precut = itohl(Simulated_Corr.Precut);
+	Simulated_Corr.Cha_ID = itohl(Simulated_Corr.Cha_ID);
+	Simulated_Corr.Data_Num = itohl(Simulated_Corr.Data_Num);
 
 	Simulated_Corr.pCorrBuf = malloc(Simulated_Corr.Data_Num * sizeof(*Simulated_Corr.pCorrBuf));
 	if (Simulated_Corr.pCorrBuf == NULL) {
@@ -324,7 +311,7 @@ int Receive_Simulated_Correlation(char* pDataBuf) {
 	//Change each float from network to host endianess
 	for (int x = 0; x < Simulated_Corr.Data_Num; x++) {
 #pragma warning (disable: 6386)
-		Simulated_Corr.pCorrBuf[x] = ntohf(*(unsigned int*)& Simulated_Corr.pCorrBuf[x]);
+		Simulated_Corr.pCorrBuf[x] = itohf(Simulated_Corr.pCorrBuf[x]);
 #pragma warning (default: 6386)
 	}
 
@@ -349,18 +336,15 @@ int Send_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num) {
 	}
 
 #pragma warning (disable: 6386)
-	unsigned int network_Cha_Num = htonl(Cha_Num);
+	unsigned int network_Cha_Num = htool(Cha_Num);
 	memcpy(&pDataBuf[0], &network_Cha_Num, sizeof(network_Cha_Num));
 
 	//Change array of params to network endianess
 	for (int x = 0; x < Cha_Num; x++) {
-		pOpt_Param[x].Cha_ID = htonl(pOpt_Param[x].Cha_ID);
+		pOpt_Param[x].Cha_ID = htool(pOpt_Param[x].Cha_ID);
 
-		unsigned int net_mua0 = htonf(pOpt_Param[x].mua0);
-		memcpy(&pOpt_Param[x].mua0, &net_mua0, sizeof(net_mua0));
-		
-		unsigned int net_musp = htonf(pOpt_Param[x].musp);
-		memcpy(&pOpt_Param[x].musp, &net_musp, sizeof(net_musp));
+		pOpt_Param[x].mua0 = htoof(pOpt_Param[x].mua0);
+		pOpt_Param[x].musp = htoof(pOpt_Param[x].musp);
 	}
 	memcpy(&pDataBuf[4], pOpt_Param, Cha_Num * sizeof(*pOpt_Param));
 #pragma warning (default: 6386)
@@ -389,25 +373,15 @@ int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Para
 	//Change params to network byte order
 	Analyzer_Prefit_Param_Type network_Analyzer = { 0 };
 
-	network_Analyzer.Precut = htonl(pAnalyzer_Prefit_Param->Precut);
-	network_Analyzer.PostCut = htonl(pAnalyzer_Prefit_Param->PostCut);
+	network_Analyzer.Precut = htool(pAnalyzer_Prefit_Param->Precut);
+	network_Analyzer.PostCut = htool(pAnalyzer_Prefit_Param->PostCut);
 
-	unsigned int net_Min_Intensity = htonf(pAnalyzer_Prefit_Param->Min_Intensity);
-	memcpy(&network_Analyzer.Min_Intensity, &net_Min_Intensity, sizeof(net_Min_Intensity));
-
-	unsigned int net_Max_Intensity = htonf(pAnalyzer_Prefit_Param->Max_Intensity);
-	memcpy(&network_Analyzer.Max_Intensity, &net_Max_Intensity, sizeof(net_Max_Intensity));
-
-	unsigned int net_FitLimt = htonf(pAnalyzer_Prefit_Param->FitLimt);
-	memcpy(&network_Analyzer.FitLimt, &net_FitLimt, sizeof(net_FitLimt));
-
-	unsigned int net_earlyLeakage = htonf(pAnalyzer_Prefit_Param->earlyLeakage);
-	memcpy(&network_Analyzer.earlyLeakage, &net_earlyLeakage, sizeof(net_earlyLeakage));
-
-	unsigned int net_lightLeakage = htonf(pAnalyzer_Prefit_Param->lightLeakage);
-	memcpy(&network_Analyzer.lightLeakage, &net_lightLeakage, sizeof(net_lightLeakage));
-
-	memcpy(&network_Analyzer.Model, &pAnalyzer_Prefit_Param->Model, sizeof(pAnalyzer_Prefit_Param->Model));
+	network_Analyzer.Min_Intensity = htoof(pAnalyzer_Prefit_Param->Min_Intensity);
+	network_Analyzer.Max_Intensity = htoof(pAnalyzer_Prefit_Param->Max_Intensity);
+	network_Analyzer.FitLimt = htoof(pAnalyzer_Prefit_Param->FitLimt);
+	network_Analyzer.earlyLeakage = htoof(pAnalyzer_Prefit_Param->earlyLeakage);
+	network_Analyzer.lightLeakage = htoof(pAnalyzer_Prefit_Param->lightLeakage);
+	network_Analyzer.Model = &pAnalyzer_Prefit_Param->Model;
 
 	memcpy(pDataBuf, &network_Analyzer, sizeof(network_Analyzer));
 #pragma warning (default: 6386 6385)
@@ -433,13 +407,13 @@ int Receive_Analyzer_Prefit_Param(char* pDataBuf) {
 	memcpy(&pAnalyzer_Prefit_Param, pDataBuf, sizeof(pAnalyzer_Prefit_Param));
 
 	//Change network endianess to host
-	pAnalyzer_Prefit_Param.Precut = ntohl(pAnalyzer_Prefit_Param.Precut);
-	pAnalyzer_Prefit_Param.PostCut = ntohl(pAnalyzer_Prefit_Param.PostCut);
-	pAnalyzer_Prefit_Param.Min_Intensity = ntohf(*(unsigned int*)&pAnalyzer_Prefit_Param.Min_Intensity);
-	pAnalyzer_Prefit_Param.Max_Intensity = ntohf(*(unsigned int*)&pAnalyzer_Prefit_Param.Max_Intensity);
-	pAnalyzer_Prefit_Param.FitLimt = ntohf(*(unsigned int*)&pAnalyzer_Prefit_Param.FitLimt);
-	pAnalyzer_Prefit_Param.earlyLeakage = ntohf(*(unsigned int*)&pAnalyzer_Prefit_Param.earlyLeakage);
-	pAnalyzer_Prefit_Param.lightLeakage = ntohf(*(unsigned int*)&pAnalyzer_Prefit_Param.lightLeakage);
+	pAnalyzer_Prefit_Param.Precut = itohl(pAnalyzer_Prefit_Param.Precut);
+	pAnalyzer_Prefit_Param.PostCut = itohl(pAnalyzer_Prefit_Param.PostCut);
+	pAnalyzer_Prefit_Param.Min_Intensity = itohf(pAnalyzer_Prefit_Param.Min_Intensity);
+	pAnalyzer_Prefit_Param.Max_Intensity = itohf(pAnalyzer_Prefit_Param.Max_Intensity);
+	pAnalyzer_Prefit_Param.FitLimt = itohf(pAnalyzer_Prefit_Param.FitLimt);
+	pAnalyzer_Prefit_Param.earlyLeakage = itohf(pAnalyzer_Prefit_Param.earlyLeakage);
+	pAnalyzer_Prefit_Param.lightLeakage = itohf(pAnalyzer_Prefit_Param.lightLeakage);
 #pragma warning (default: 6386 6385)
 
 	Get_Analyzer_Prefit_Param_CB(&pAnalyzer_Prefit_Param);
@@ -463,14 +437,14 @@ int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	const unsigned __int16 frame_version = htons(FRAME_VERSION);
+	const unsigned __int16 frame_version = htoos(FRAME_VERSION);
 #pragma warning (disable: 6386)
 	memcpy(&pTransmission->pFrame[0], &frame_version, sizeof(frame_version));
 #pragma warning (default: 6386)
 
-	const unsigned __int32 command = htonl(COMMAND_ID);
+	const unsigned __int32 command = htool(COMMAND_ID);
 	memcpy(&pTransmission->pFrame[2], &command, sizeof(command));
-	data_ID = htonl(data_ID);
+	data_ID = htool(data_ID);
 	memcpy(&pTransmission->pFrame[6], &data_ID, sizeof(data_ID));
 	memcpy(&pTransmission->pFrame[10], pDataBuf, BufferSize);
 
@@ -649,7 +623,7 @@ int process_recv(char* buff, unsigned int buffLen) {
 	//Ensure header is correct
 	unsigned __int16 header;
 	memcpy(&header, &buff[0], HEADER_SIZE);
-	header = ntohs(header);
+	header = itohs(header);
 	if (header != FRAME_VERSION) {
 		printf("Invalid header\n");
 		return FRAME_VERSION_ERROR;
@@ -659,7 +633,7 @@ int process_recv(char* buff, unsigned int buffLen) {
 	//Ensure type id is correct
 	unsigned __int32 type_id;
 	memcpy(&type_id, &buff[2], TYPE_ID_SIZE);
-	type_id = ntohl(type_id);
+	type_id = itohl(type_id);
 	if (type_id != DATA_ID) {
 		printf("Invalid Type ID\n");
 		return FRAME_INVALID_DATA;
@@ -668,7 +642,7 @@ int process_recv(char* buff, unsigned int buffLen) {
 	//Call correct callbacks based on data id
 	Data_ID data_id;
 	memcpy(&data_id, &buff[6], DATA_ID_SIZE);
-	data_id = ntohl(data_id);
+	data_id = itohl(data_id);
 
 	unsigned int pDataBuffLen = buffLen - DATA_ID_SIZE - TYPE_ID_SIZE - HEADER_SIZE;
 	char* pDataBuff = malloc(pDataBuffLen);
@@ -711,4 +685,85 @@ int process_recv(char* buff, unsigned int buffLen) {
 	free(pDataBuff);
 
 	return NO_DCS_ERROR;
+}
+
+
+////////////////////////////////
+//Endianess management functions
+////////////////////////////////
+static inline bool should_swap_htoo() {
+	if (!IS_BIG_ENDIAN && ENDIANESS_OUTPUT == BIG_ENDIAN) {
+		return true;
+	}
+	if (IS_BIG_ENDIAN && ENDIANESS_OUTPUT == LITTLE_ENDIAN) {
+		return true;
+	}
+	return false;
+}
+
+static inline bool should_swap_itoh() {
+	if (!IS_BIG_ENDIAN && ENDIANESS_INPUT == BIG_ENDIAN) {
+		return true;
+	}
+	if (IS_BIG_ENDIAN && ENDIANESS_INPUT == LITTLE_ENDIAN) {
+		return true;
+	}
+	return false;
+}
+
+
+static inline float swap_float(const float inFloat) {
+	float retVal = 0.0f;
+	char* floatToConvert = (char*)&inFloat;
+	char* returnFloat = (char*)&retVal;
+
+	//Swap the bytes into a temporary buffer
+	returnFloat[0] = floatToConvert[3];
+	returnFloat[1] = floatToConvert[2];
+	returnFloat[2] = floatToConvert[1];
+	returnFloat[3] = floatToConvert[0];
+
+	return retVal;
+}
+
+u_long htool(u_long hostlong) {
+	if (should_swap_htoo()) {
+		return Swap32(hostlong);
+	}
+	return hostlong;
+}
+
+u_short htoos(u_short hostshort) {
+	if (should_swap_htoo()) {
+		return Swap16(hostshort);
+	}
+	return hostshort;
+}
+
+float htoof(float value) {
+	if (should_swap_htoo()) {
+		return swap_float(value);
+	}
+	return value;
+}
+
+u_long itohl(u_long ilong) {
+	if (should_swap_itoh()) {
+		return Swap32(ilong);
+	}
+	return ilong;
+}
+
+u_short itohs(u_short ishort) {
+	if (should_swap_itoh()) {
+		return Swap16(ishort);
+	}
+	return ishort;
+}
+
+float itohf(float value) {
+	if (should_swap_itoh()) {
+		return swap_float(value);
+	}
+	return value;
 }

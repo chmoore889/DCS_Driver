@@ -34,7 +34,7 @@ int process_recv(char* received_data, unsigned int received_data_size, char** to
 	//Ensure header is correct
 	unsigned __int16 header;
 	memcpy(&header, &received_data[0], HEADER_SIZE);
-	header = ntohs(header);
+	header = itohs(header);
 	if (header != FRAME_VERSION) {
 		return FRAME_VERSION_ERROR;
 	}
@@ -43,7 +43,7 @@ int process_recv(char* received_data, unsigned int received_data_size, char** to
 	//Ensure type id is correct
 	unsigned __int32 type_id;
 	memcpy(&type_id, &received_data[2], TYPE_ID_SIZE);
-	type_id = ntohl(type_id);
+	type_id = itohl(type_id);
 	if (type_id != COMMAND_ID) {
 		return FRAME_INVALID_DATA;
 	}
@@ -52,7 +52,7 @@ int process_recv(char* received_data, unsigned int received_data_size, char** to
 	//Return correct data based on command id
 	Data_ID command_id;
 	memcpy(&command_id, &received_data[6], DATA_ID_SIZE);
-	command_id = ntohl(command_id);
+	command_id = itohl(command_id);
 
 	char* dcs_header = NULL;
 	unsigned int header_size = 0;;
@@ -187,7 +187,7 @@ static int Process_DCS_Status(char** to_send_data, unsigned int* to_send_data_si
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	data_id = htonl(data_id);
+	data_id = htool(data_id);
 	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
 	index += sizeof(data_id);
 
@@ -197,7 +197,7 @@ static int Process_DCS_Status(char** to_send_data, unsigned int* to_send_data_si
 	memcpy(&(*to_send_data)[index], &bAnalyzer, sizeof(bAnalyzer));
 	index += sizeof(bAnalyzer);
 
-	DCS_Cha_Num = htonl(DCS_Cha_Num);
+	DCS_Cha_Num = htool(DCS_Cha_Num);
 	memcpy(&(*to_send_data)[index], &DCS_Cha_Num, sizeof(DCS_Cha_Num));
 
 	return NO_DCS_ERROR;
@@ -212,9 +212,9 @@ static int Process_Corr_Set(char* received_data, unsigned int received_data_size
 	memcpy(&Corr_Time, &received_data[8], sizeof(Corr_Time));
 
 	//Change network endianess to host
-	Data_N = ntohl(Data_N);
-	Scale = ntohl(Scale);
-	Corr_Time = ntohl(Corr_Time);
+	Data_N = itohl(Data_N);
+	Scale = itohl(Scale);
+	Corr_Time = itohl(Corr_Time);
 
 	printf("Setting Correlator Params:\nData_N: %d\nScale: %d\nCorr_Time: %d\n", Data_N, Scale, Corr_Time);
 
@@ -241,19 +241,19 @@ static int Process_Corr_Status(char** to_send_data, unsigned int* to_send_data_s
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	data_id = htonl(data_id);
+	data_id = htool(data_id);
 	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
 	index += sizeof(data_id);
 
-	Data_N = htonl(Data_N);
+	Data_N = htool(Data_N);
 	memcpy(&(*to_send_data)[index], &Data_N, sizeof(Data_N));
 	index += sizeof(Data_N);
 
-	Scale = htonl(Scale);
+	Scale = htool(Scale);
 	memcpy(&(*to_send_data)[index], &Scale, sizeof(Scale));
 	index += sizeof(Scale);
 
-	Sample_Size = htonl(Sample_Size);
+	Sample_Size = htool(Sample_Size);
 	memcpy(&(*to_send_data)[index], &Sample_Size, sizeof(Sample_Size));
 
 	return NO_DCS_ERROR;
@@ -265,7 +265,7 @@ static int Process_Analyzer_Set(char* received_data, unsigned int received_data_
 
 	//Copy prepended number of channels to local
 	memcpy(&Cha_Num, &received_data[0], sizeof(Cha_Num));
-	Cha_Num = ntohl(Cha_Num);
+	Cha_Num = itohl(Cha_Num);
 
 	settings = malloc(sizeof(*settings) * Cha_Num);
 	if (settings == NULL) {
@@ -277,13 +277,13 @@ static int Process_Analyzer_Set(char* received_data, unsigned int received_data_
 		memcpy(&settings[x], &received_data[sizeof(Cha_Num) + sizeof(*settings) * x], sizeof(*settings));
 
 		//Change network endianess to host
-		settings[x].Alpha = ntohf(*(unsigned int*)&settings[x].Alpha);
-		settings[x].Beta = ntohf(*(unsigned int*)&settings[x].Beta);
-		settings[x].Db = ntohf(*(unsigned int*)&settings[x].Db);
-		settings[x].Distance = ntohf(*(unsigned int*)&settings[x].Distance);
-		settings[x].mua0 = ntohf(*(unsigned int*)&settings[x].mua0);
-		settings[x].musp = ntohf(*(unsigned int*)&settings[x].musp);
-		settings[x].Wavelength = ntohf(*(unsigned int*)&settings[x].Wavelength);
+		settings[x].Alpha = itohf(settings[x].Alpha);
+		settings[x].Beta = itohf(settings[x].Beta);
+		settings[x].Db = itohf(settings[x].Db);
+		settings[x].Distance = itohf(settings[x].Distance);
+		settings[x].mua0 = itohf(settings[x].mua0);
+		settings[x].musp = itohf(settings[x].musp);
+		settings[x].Wavelength = itohf(settings[x].Wavelength);
 	}
 #pragma warning (default: 6386 6385)
 
@@ -336,36 +336,23 @@ static int Process_Analyzer_Status(char** to_send_data, unsigned int* to_send_da
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	data_id = htonl(data_id);
+	data_id = htool(data_id);
 	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
 	index += sizeof(data_id);
 
-	unsigned int net_Cha_Num = htonl(Cha_Num);
+	unsigned int net_Cha_Num = htool(Cha_Num);
 	memcpy(&(*to_send_data)[index], &net_Cha_Num, sizeof(net_Cha_Num));
 	index += sizeof(net_Cha_Num);
 
 	//Change to network endianess
 	for (int x = 0; x < Cha_Num; x++) {
-		unsigned int net_Alpha = htonf(data[x].Alpha);
-		memcpy(&data[x].Alpha, &net_Alpha, sizeof(net_Alpha));
-
-		unsigned int net_Beta = htonf(data[x].Beta);
-		memcpy(&data[x].Beta, &net_Beta, sizeof(net_Beta));
-
-		unsigned int net_Db = htonf(data[x].Db);
-		memcpy(&data[x].Db, &net_Db, sizeof(net_Db));
-
-		unsigned int net_Distance = htonf(data[x].Distance);
-		memcpy(&data[x].Distance, &net_Distance, sizeof(net_Distance));
-
-		unsigned int net_mua0 = htonf(data[x].mua0);
-		memcpy(&data[x].mua0, &net_mua0, sizeof(net_mua0));
-
-		unsigned int net_musp = htonf(data[x].musp);
-		memcpy(&data[x].musp, &net_musp, sizeof(net_musp));
-
-		unsigned int net_Wavelength = htonf(data[x].Wavelength);
-		memcpy(&data[x].Wavelength, &net_Wavelength, sizeof(net_Wavelength));
+		data[x].Alpha = htoof(data[x].Alpha);
+		data[x].Beta = htoof(data[x].Beta);
+		data[x].Db = htoof(data[x].Db);
+		data[x].Distance = htoof(data[x].Distance); 
+		data[x].mua0 = htoof(data[x].mua0);
+		data[x].musp = htoof(data[x].musp);
+		data[x].Wavelength = htoof(data[x].Wavelength);
 	}
 
 	memcpy(&(*to_send_data)[index], data, sizeof(*data) * Cha_Num);
@@ -380,9 +367,9 @@ static int Process_Start_DCS(char* received_data, unsigned int received_data_siz
 	int Cha_Num;
 
 	memcpy(&Interval, &received_data[0], sizeof(Interval));
-	Interval = ntohl(Interval);
+	Interval = itohl(Interval);
 	memcpy(&Cha_Num, &received_data[4], sizeof(Cha_Num));
-	Cha_Num = ntohl(Cha_Num);
+	Cha_Num = itohl(Cha_Num);
 
 	pCha_IDs = malloc(sizeof(*pCha_IDs) * Cha_Num);
 	if (pCha_IDs == NULL) {
@@ -393,7 +380,7 @@ static int Process_Start_DCS(char* received_data, unsigned int received_data_siz
 	//Change to network to host endian
 	for (int x = 0; x < Cha_Num; x++) {
 #pragma warning (disable: 6386)
-		pCha_IDs[x] = ntohl(pCha_IDs[x]);
+		pCha_IDs[x] = itohl(pCha_IDs[x]);
 #pragma warning (default: 6386)
 	}
 
@@ -462,25 +449,24 @@ static int Process_Simulated_Correlation(char** to_send_data, unsigned int* to_s
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	data_id = htonl(data_id);
+	data_id = htool(data_id);
 	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
 	index += sizeof(data_id);
 
-	Precut = htonl(Precut);
+	Precut = htool(Precut);
 	memcpy(&(*to_send_data)[index], &Precut, sizeof(Precut));
 	index += sizeof(Precut);
 
-	Cha_ID = htonl(Cha_ID);
+	Cha_ID = htool(Cha_ID);
 	memcpy(&(*to_send_data)[index], &Cha_ID, sizeof(Cha_ID));
 	index += sizeof(Cha_ID);
 
-	unsigned int net_Data_Num = htonl(Data_Num);
+	unsigned int net_Data_Num = htool(Data_Num);
 	memcpy(&(*to_send_data)[index], &net_Data_Num, sizeof(net_Data_Num));
 	index += sizeof(net_Data_Num);
 
 	for (int x = 0; x < Data_Num; x++) {
-		unsigned int net_float = htonf(pCorrBuf[x]);
-		memcpy(&pCorrBuf[x], &net_float, sizeof(net_float));
+		pCorrBuf[x] = htoof(pCorrBuf[x]);
 	}
 
 	memcpy(&(*to_send_data)[index], pCorrBuf, sizeof(*pCorrBuf) * Data_Num);
@@ -495,7 +481,7 @@ static int Process_Optical_Set(char* received_data, unsigned int received_data_s
 
 	//Copy prepended number of channels to local
 	memcpy(&Cha_Num, &received_data[0], sizeof(Cha_Num));
-	Cha_Num = ntohl(Cha_Num);
+	Cha_Num = itohl(Cha_Num);
 
 	param = malloc(sizeof(*param) * Cha_Num);
 	if (param == NULL) {
@@ -507,9 +493,9 @@ static int Process_Optical_Set(char* received_data, unsigned int received_data_s
 		memcpy(&param[x], &received_data[sizeof(Cha_Num) + sizeof(*param) * x], sizeof(*param));
 
 		//Change network endianess to host
-		param[x].Cha_ID = ntohl((u_long)param[x].Cha_ID);
-		param[x].mua0 = ntohf(*(unsigned int*)&param[x].mua0);
-		param[x].musp = ntohf(*(unsigned int*)&param[x].musp);
+		param[x].Cha_ID = itohl((u_long)param[x].Cha_ID);
+		param[x].mua0 = itohf(param[x].mua0);
+		param[x].musp = itohf(param[x].musp);
 	}
 #pragma warning (default: 6386 6385)
 
@@ -533,13 +519,13 @@ static int Process_Analyzer_Prefit(char* received_data, unsigned int received_da
 	memcpy(&prefit, received_data, sizeof(prefit));
 
 	//Change network endianess to host
-	prefit.Precut = ntohl((u_long) prefit.Precut);
-	prefit.PostCut = ntohl((u_long) prefit.PostCut);
-	prefit.Min_Intensity = ntohf(*(unsigned int*)&prefit.Min_Intensity);
-	prefit.Max_Intensity = ntohf(*(unsigned int*)&prefit.Max_Intensity);
-	prefit.FitLimt = ntohf(*(unsigned int*)&prefit.FitLimt);
-	prefit.lightLeakage = ntohf(*(unsigned int*)&prefit.lightLeakage);
-	prefit.earlyLeakage = ntohf(*(unsigned int*)&prefit.earlyLeakage);
+	prefit.Precut = itohl((u_long) prefit.Precut);
+	prefit.PostCut = itohl((u_long) prefit.PostCut);
+	prefit.Min_Intensity = itohf(prefit.Min_Intensity);
+	prefit.Max_Intensity = itohf(prefit.Max_Intensity);
+	prefit.FitLimt = itohf(prefit.FitLimt);
+	prefit.lightLeakage = itohf(prefit.lightLeakage);
+	prefit.earlyLeakage = itohf(prefit.earlyLeakage);
 #pragma warning (default: 6386 6385)
 
 	//Print received prefit for testing purposes
@@ -579,27 +565,18 @@ static int Process_Get_Analyzer_Prefit(char** to_send_data, unsigned int* to_sen
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	data_id = htonl(data_id);
+	data_id = htool(data_id);
 	memcpy(&(*to_send_data)[0], &data_id, sizeof(data_id));
 
 	//Change to network endianess
-	data.Precut = htonl(data.Precut);
-	data.PostCut = htonl(data.PostCut);
+	data.Precut = htool(data.Precut);
+	data.PostCut = htool(data.PostCut);
 
-	unsigned int net_Min_Intensity = htonf(data.Min_Intensity);
-	memcpy(&data.Min_Intensity, &net_Min_Intensity, sizeof(net_Min_Intensity));
-
-	unsigned int net_Max_Intensity = htonf(data.Max_Intensity);
-	memcpy(&data.Max_Intensity, &net_Max_Intensity, sizeof(net_Max_Intensity));
-
-	unsigned int net_FitLimt = htonf(data.FitLimt);
-	memcpy(&data.FitLimt, &net_FitLimt, sizeof(net_FitLimt));
-
-	unsigned int net_lightLeakage = htonf(data.lightLeakage);
-	memcpy(&data.lightLeakage, &net_lightLeakage, sizeof(net_lightLeakage));
-
-	unsigned int net_earlyLeakage = htonf(data.earlyLeakage);
-	memcpy(&data.earlyLeakage, &net_earlyLeakage, sizeof(net_earlyLeakage));
+	data.Min_Intensity = htoof(data.Min_Intensity);
+	data.Max_Intensity = htoof(data.Max_Intensity);
+	data.FitLimt = htoof(data.FitLimt);
+	data.lightLeakage = htoof(data.lightLeakage);
+	data.earlyLeakage = htoof(data.earlyLeakage);
 
 	memcpy(&(*to_send_data)[4], &data, sizeof(data));
 
@@ -607,8 +584,8 @@ static int Process_Get_Analyzer_Prefit(char** to_send_data, unsigned int* to_sen
 }
 
 static int write_DCS_header(char** buff, unsigned int* header_size) {
-	const unsigned __int16 frame_version = htons(FRAME_VERSION);
-	const unsigned __int32 command = htonl(DATA_ID);
+	const unsigned __int16 frame_version = htoos(FRAME_VERSION);
+	const unsigned __int32 command = htool(DATA_ID);
 
 	//Allocate just the header (2) and type id (4)
 	*header_size = sizeof(frame_version) + sizeof(command);
@@ -635,12 +612,92 @@ static int write_command_ack_resp(char** to_send_data, unsigned int* to_send_dat
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	data_id = htonl(data_id);
+	data_id = htool(data_id);
 	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
 	index += sizeof(data_id);
 
-	command_being_responded = htonl(command_being_responded);
+	command_being_responded = htool(command_being_responded);
 	memcpy(&(*to_send_data)[index], &command_being_responded, sizeof(command_being_responded));
 
 	return NO_DCS_ERROR;
+}
+
+////////////////////////////////
+//Endianess management functions
+////////////////////////////////
+static inline bool should_swap_htoo() {
+	if (!IS_BIG_ENDIAN && ENDIANESS_OUTPUT == BIG_ENDIAN) {
+		return true;
+	}
+	if (IS_BIG_ENDIAN && ENDIANESS_OUTPUT == LITTLE_ENDIAN) {
+		return true;
+	}
+	return false;
+}
+
+static inline bool should_swap_itoh() {
+	if (!IS_BIG_ENDIAN && ENDIANESS_INPUT == BIG_ENDIAN) {
+		return true;
+	}
+	if (IS_BIG_ENDIAN && ENDIANESS_INPUT == LITTLE_ENDIAN) {
+		return true;
+	}
+	return false;
+}
+
+
+static inline float swap_float(const float inFloat) {
+	float retVal = 0.0f;
+	char* floatToConvert = (char*)&inFloat;
+	char* returnFloat = (char*)&retVal;
+
+	//Swap the bytes into a temporary buffer
+	returnFloat[0] = floatToConvert[3];
+	returnFloat[1] = floatToConvert[2];
+	returnFloat[2] = floatToConvert[1];
+	returnFloat[3] = floatToConvert[0];
+
+	return retVal;
+}
+
+u_long htool(u_long hostlong) {
+	if (should_swap_htoo()) {
+		return Swap32(hostlong);
+	}
+	return hostlong;
+}
+
+u_short htoos(u_short hostshort) {
+	if (should_swap_htoo()) {
+		return Swap16(hostshort);
+	}
+	return hostshort;
+}
+
+float htoof(float value) {
+	if (should_swap_htoo()) {
+		return swap_float(value);
+	}
+	return value;
+}
+
+u_long itohl(u_long ilong) {
+	if (should_swap_itoh()) {
+		return Swap32(ilong);
+	}
+	return ilong;
+}
+
+u_short itohs(u_short ishort) {
+	if (should_swap_itoh()) {
+		return Swap16(ishort);
+	}
+	return ishort;
+}
+
+float itohf(float value) {
+	if (should_swap_itoh()) {
+		return swap_float(value);
+	}
+	return value;
 }

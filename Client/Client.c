@@ -8,7 +8,7 @@
 
 #define TEST_ARRAY_LEN 5
 
-#define FUNC_TO_TEST 11
+#define FUNC_TO_TEST 10
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("%s\n", bCorr ? "true" : "false");
