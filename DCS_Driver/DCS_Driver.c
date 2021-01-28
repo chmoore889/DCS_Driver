@@ -15,8 +15,8 @@
 #include "Internal.h"
 
 #define DEFAULT_BUFLEN 1024
-#define DEFAULT_PORT "27015"
-#define HOST_NAME "localhost"
+#define DEFAULT_PORT "5000"
+#define HOST_NAME "129.49.117.79"
 
 int Get_DCS_Status() {
 	return Send_Get_DSC_Status();
@@ -516,7 +516,7 @@ int send_data_and_handle(Transmission_Data_Type* data_to_send) {
 		// Connect to server.
 		iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
 		if (iResult == SOCKET_ERROR) {
-			printf("connection to server failed\n");
+			printf("connection to server failed - failed with error: %ld\n", WSAGetLastError());
 			closesocket(ConnectSocket);
 			ConnectSocket = INVALID_SOCKET;
 			continue;

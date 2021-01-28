@@ -8,7 +8,7 @@
 
 #define TEST_ARRAY_LEN 5
 
-#define FUNC_TO_TEST 10
+#define FUNC_TO_TEST 11
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("%s\n", bCorr ? "true" : "false");
@@ -132,10 +132,10 @@ int main(void) {
 		.Precut = 5,
 		.PostCut = 10,
 		.Min_Intensity = 0.5,
-		.Max_Intensity = 3.14159,
-		.FitLimt = 4.5,
-		.lightLeakage = 6.5,
-		.earlyLeakage = 7.5,
+		.Max_Intensity = 3.14159f,
+		.FitLimt = 4.5f,
+		.lightLeakage = 6.5f,
+		.earlyLeakage = 7.5f,
 		.Model = true,
 	};
 	result = Set_Analyzer_Prefit_Param(&prefit);
