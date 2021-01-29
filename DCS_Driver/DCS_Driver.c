@@ -15,7 +15,7 @@
 #include "Internal.h"
 
 #define DEFAULT_BUFLEN 1024
-#define DEFAULT_PORT "5000"
+#define DEFAULT_PORT "50000"
 #define HOST_NAME "129.49.117.79"
 
 int Get_DCS_Status() {
