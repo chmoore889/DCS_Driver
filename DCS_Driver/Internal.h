@@ -128,4 +128,4 @@ unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size);
 bool check_checksum(char* pDataBuf, size_t size);
 
 int send_data_and_handle(Transmission_Data_Type* data_to_send);
-int process_recv(char* buff);
+int process_recv(char* buff, unsigned __int32 buffLen);

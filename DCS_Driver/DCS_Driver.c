@@ -667,14 +667,13 @@ int send_data_and_handle(Transmission_Data_Type* data_to_send) {
 
 	hexDump("recv", frame_data, frame_data_size);
 
-	//
 	for (unsigned __int32 totLen = 0; totLen < frame_data_size;) {
 		//Strip off 32 bit integer size from beginning of frame to make well-defined DCS frame `buff`
 		unsigned __int32 frameLen;
-		memcpy(&frameLen, frame_data, sizeof(frameLen));
+		memcpy(&frameLen, &frame_data[totLen], sizeof(frameLen));
 
-		char* buff = &frame_data[sizeof(frameLen)];
-		iResult = process_recv(frame_data);
+		char* buff = &frame_data[sizeof(frameLen) + totLen];
+		iResult = process_recv(buff, frameLen);
 		if (iResult != NO_DCS_ERROR) {
 			return iResult;
 		}
@@ -691,12 +690,8 @@ int send_data_and_handle(Transmission_Data_Type* data_to_send) {
 	return iResult;
 }
 
-int process_recv(char* rawBuff) {
-	//Strip off 32 bit integer size from beginning of packet to make well-defined DCS packet `buff`
-	unsigned __int32 buffLen;
-	memcpy(&buffLen, rawBuff, sizeof(buffLen));
-
-	char* buff = &rawBuff[sizeof(buffLen)];
+int process_recv(char* buff, unsigned __int32 buffLen) {
+	hexDump("process_recv", buff, buffLen);
 
 	//Verify checksum
 	if (!check_checksum(buff, buffLen)) {
