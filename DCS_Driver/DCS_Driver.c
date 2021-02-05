@@ -667,8 +667,21 @@ int send_data_and_handle(Transmission_Data_Type* data_to_send) {
 
 	hexDump("recv", frame_data, frame_data_size);
 
-	iResult = process_recv(frame_data, frame_data_size);
-	printf("%d", iResult);
+	//
+	for (unsigned __int32 totLen = 0; totLen < frame_data_size;) {
+		//Strip off 32 bit integer size from beginning of frame to make well-defined DCS frame `buff`
+		unsigned __int32 frameLen;
+		memcpy(&frameLen, frame_data, sizeof(frameLen));
+
+		char* buff = &frame_data[sizeof(frameLen)];
+		iResult = process_recv(frame_data);
+		if (iResult != NO_DCS_ERROR) {
+			return iResult;
+		}
+
+		totLen += sizeof(frameLen) + frameLen;
+		//printf("%d", iResult);
+	}
 	free(frame_data);
 
 	//Cleanup
