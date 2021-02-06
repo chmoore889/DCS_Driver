@@ -3,12 +3,13 @@
 #include <crtdbg.h>
 #include <stdbool.h>
 #include <stdio.h>
+#include <string.h>
 
 #include "DCS_Driver.h"
 
-#define TEST_ARRAY_LEN 5
+#define TEST_ARRAY_LEN 6
 
-#define FUNC_TO_TEST 10
+#define FUNC_TO_TEST 11
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("%s\n", bCorr ? "true" : "false");
@@ -56,6 +57,20 @@ void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
 	printf("]\n");
 }
 
+void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
+	unsigned __int32 strSize = Size + 1;
+	char* errorString = calloc(strSize, sizeof(char));
+	if (errorString == NULL) {
+		return;
+	}
+
+	memcpy(errorString, pMessage, Size);
+
+	printf("%s", errorString);
+
+	free(errorString);
+}
+
 int main(void) {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
@@ -69,7 +84,7 @@ int main(void) {
 	Correlator_Setting_Type correlator_settings = {
 		.Corr_Time = 5.5,
 		.Data_N = 4,
-		.Scale = 10,
+		.Scale = 7,
 	};
 	result = Set_Correlator_Setting(&correlator_settings);
 #endif // 1
@@ -82,13 +97,13 @@ int main(void) {
 	Analyzer_Setting_Type analyzer_settings_arr[TEST_ARRAY_LEN];
 	for (int x = 0; x < TEST_ARRAY_LEN; x++) {
 		analyzer_settings_arr[x] = (Analyzer_Setting_Type) {
-			.Alpha = 10.1 - x,
-			.Beta = 9.2 - x,
-			.Db = 8.3 - x,
-			.Distance = 7.4 - x,
-			.mua0 = 6.6 - x,
-			.musp = 5.7 - x,
-			.Wavelength = 4.8 - x,
+			.Alpha = 0.00001f,
+			.Beta = 0.5f,
+			.Db = 0.0f,
+			.Distance = 2.0f,
+			.mua0 = 0.1f,
+			.musp = 17.0f,
+			.Wavelength = 783.0f,
 		};
 	}
 	result = Set_Analyzer_Setting(analyzer_settings_arr, TEST_ARRAY_LEN);

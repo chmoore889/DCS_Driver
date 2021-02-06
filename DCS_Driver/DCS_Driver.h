@@ -123,3 +123,6 @@ void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr);
 
 //Callback for Get_Analyzer_Prefit_Param
 void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Setting);
+
+//Callback for error messages that are received
+void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size);

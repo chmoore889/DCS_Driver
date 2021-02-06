@@ -56,8 +56,8 @@ host and the remote DCS. GET IDs are for the data from the DCS*/
 #define SET_ANALYZER_PREFIT_PARAM 9
 #define GET_ANALYZER_PREFIT_PARAM 10
 #define SET_OPTICAL_PARAM 11
-#define CHECK_NET_CONNECTION 254
 #define GET_ERROR_MESSAGE 254
+#define CHECK_NET_CONNECTION 254
 #define STOP_DCS 255
 #define COMMAND_ACK 255
 
@@ -70,6 +70,17 @@ host and the remote DCS. GET IDs are for the data from the DCS*/
 #define HEADER_SIZE 2
 #define TYPE_ID_SIZE 4
 #define DATA_ID_SIZE 4
+#define CHECKSUM_SIZE 1
+
+//Output colors
+#define ANSI_COLOR_RED     "\x1b[31m"
+#define ANSI_COLOR_GREEN   "\x1b[32m"
+#define ANSI_COLOR_YELLOW  "\x1b[33m"
+#define ANSI_COLOR_BLUE    "\x1b[34m"
+#define ANSI_COLOR_MAGENTA "\x1b[35m"
+#define ANSI_COLOR_CYAN    "\x1b[36m"
+#define ANSI_COLOR_RESET   "\x1b[0m"
+
 
 typedef unsigned __int32 Data_ID;
 
@@ -118,6 +129,9 @@ int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Para
 //be received by the function Receive_Analyzer_Prefit_Param.
 int Send_Get_Analyzer_Prefit_Param();
 int Receive_Analyzer_Prefit_Param(char* pDataBuf);
+
+int Receive_Error_Message(char* pDataBuf);
+int Receive_Command_ACK(char* pDataBuf);
 
 //This function generates the frame to be sent to the remote DCS.
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize);

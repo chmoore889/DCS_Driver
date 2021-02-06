@@ -485,6 +485,36 @@ int Receive_Analyzer_Prefit_Param(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
+int Receive_Error_Message(char* pDataBuf) {
+	//Read 4 bytes prepended string size
+	unsigned __int32 strSize;
+	memcpy(&strSize, pDataBuf, sizeof(strSize));
+
+	//Allocate memory for string
+	char* pMessage = malloc(strSize);
+	if (pMessage == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	memcpy(pMessage, &pDataBuf[sizeof(strSize)], strSize);
+
+	printf(ANSI_COLOR_RED);
+	printf("Remote DCS Error!\n");
+	Get_Error_Message_CB(pMessage, strSize);
+	printf(ANSI_COLOR_RESET);
+
+	free(pMessage);
+	return NO_DCS_ERROR;
+}
+
+int Receive_Command_ACK(char* pDataBuf) {
+	unsigned __int32 commandId;
+	memcpy(&commandId, pDataBuf, sizeof(commandId));
+	printf(ANSI_COLOR_GREEN"Command Ack: 0x%02x\n"ANSI_COLOR_RESET, commandId);
+
+	return NO_DCS_ERROR;
+}
+
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize) {
 	Transmission_Data_Type* pTransmission = malloc(sizeof(Transmission_Data_Type));
 	if (pTransmission == NULL) {
@@ -673,9 +703,9 @@ int send_data_and_handle(Transmission_Data_Type* data_to_send) {
 		memcpy(&frameLen, &frame_data[totLen], sizeof(frameLen));
 
 		char* buff = &frame_data[sizeof(frameLen) + totLen];
-		iResult = process_recv(buff, frameLen);
-		if (iResult != NO_DCS_ERROR) {
-			return iResult;
+		int tmpiResult = process_recv(buff, frameLen);
+		if (tmpiResult != NO_DCS_ERROR) {
+			iResult = tmpiResult;
 		}
 
 		totLen += sizeof(frameLen) + frameLen;
@@ -723,7 +753,7 @@ int process_recv(char* buff, unsigned __int32 buffLen) {
 	memcpy(&data_id, &buff[6], DATA_ID_SIZE);
 	data_id = itohl(data_id);
 
-	unsigned int pDataBuffLen = buffLen - DATA_ID_SIZE - TYPE_ID_SIZE - HEADER_SIZE;
+	unsigned int pDataBuffLen = buffLen - DATA_ID_SIZE - TYPE_ID_SIZE - HEADER_SIZE - CHECKSUM_SIZE;
 	char* pDataBuff = malloc(pDataBuffLen);
 	if (pDataBuff == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
@@ -731,39 +761,44 @@ int process_recv(char* buff, unsigned __int32 buffLen) {
 
 	memcpy(pDataBuff, &buff[10], pDataBuffLen);
 
+	int err = NO_DCS_ERROR;
 	switch (data_id) {
 	case GET_DCS_STATUS:
-		Receive_DCS_Status(pDataBuff);
+		err = Receive_DCS_Status(pDataBuff);
 		break;
 
 	case GET_CORRELATOR_SETTING:
-		Receive_Correlator_Setting(pDataBuff);
+		err = Receive_Correlator_Setting(pDataBuff);
 		break;
 
 	case GET_ANALYZER_SETTING:
-		Receive_Analyzer_Setting(pDataBuff);
+		err = Receive_Analyzer_Setting(pDataBuff);
 		break;
 
 	case GET_SIMULATED_DATA:
-		Receive_Simulated_Correlation(pDataBuff);
+		err = Receive_Simulated_Correlation(pDataBuff);
 		break;
 
 	case GET_ANALYZER_PREFIT_PARAM:
-		Receive_Analyzer_Prefit_Param(pDataBuff);
+		err = Receive_Analyzer_Prefit_Param(pDataBuff);
 		break;
 
 	case COMMAND_ACK:
-		printf("Command Ack\n");
+		err = Receive_Command_ACK(pDataBuff);
+		break;
+
+	case GET_ERROR_MESSAGE:
+		err = Receive_Error_Message(pDataBuff);
 		break;
 
 	default:
 		printf("Invalid Data ID\n");
-		return FRAME_INVALID_DATA;
+		err = FRAME_INVALID_DATA;
 	}
 
 	free(pDataBuff);
 
-	return NO_DCS_ERROR;
+	return err;
 }
 
 
