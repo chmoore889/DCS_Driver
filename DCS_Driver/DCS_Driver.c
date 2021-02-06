@@ -792,7 +792,7 @@ int process_recv(char* buff, unsigned __int32 buffLen) {
 		break;
 
 	default:
-		printf("Invalid Data ID\n");
+		printf(ANSI_COLOR_RED"Invalid Data ID\n"ANSI_COLOR_RESET);
 		err = FRAME_INVALID_DATA;
 	}
 
