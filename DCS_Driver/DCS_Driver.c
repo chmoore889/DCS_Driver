@@ -1,25 +1,22 @@
 #define _CRTDBG_MAP_ALLOC
-#include <stdlib.h>
-#include <crtdbg.h>
+#include<stdlib.h>
+#include<crtdbg.h>
 #include<stdio.h>
 #include<stdbool.h>
 #include<memory.h>
 #include<math.h>
 
-#include<WinSock2.h>
-#include <ws2tcpip.h>
-
 #pragma comment (lib, "Ws2_32.lib")
 
 #include "DCS_Driver.h"
 #include "Internal.h"
+#include "COM_Task.h"
 
 #define DEFAULT_BUFLEN 1024
 #define DEFAULT_PORT "50000"
 #define HOST_NAME "129.49.117.79"
 
-//Prints out data at addr in hex format in debug build
-static void hexDump(const char* desc, const void* addr, const int len) {
+inline void hexDump(const char* desc, const void* addr, const int len) {
 #if defined(_DEBUG)
 	int i;
 	unsigned char buff[17];
@@ -82,11 +79,11 @@ static void hexDump(const char* desc, const void* addr, const int len) {
 #endif
 }
 
-int Get_DCS_Status() {
+int Get_DCS_Status(void) {
 	return Send_Get_DSC_Status();
 }
 
-int Send_Get_DSC_Status() {
+int Send_Get_DSC_Status(void) {
 	return Send_DCS_Command(GET_DCS_STATUS, NULL, 0);
 }
 
@@ -151,11 +148,11 @@ int Send_Correlator_Setting(Correlator_Setting_Type* pCorrelator_Setting) {
 	return result;
 }
 
-int Get_Correlator_Setting() {
+int Get_Correlator_Setting(void) {
 	return Send_Get_Correlator_Setting();
 }
 
-int Send_Get_Correlator_Setting() {
+int Send_Get_Correlator_Setting(void) {
 	return Send_DCS_Command(GET_CORRELATOR_SETTING, NULL, 0);
 }
 
@@ -234,11 +231,11 @@ int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num)
 	return result;
 }
 
-int Get_Analyzer_Setting() {
+int Get_Analyzer_Setting(void) {
 	return Send_Get_Analyzer_Setting();
 }
 
-int Send_Get_Analyzer_Setting() {
+int Send_Get_Analyzer_Setting(void) {
 	return Send_DCS_Command(GET_ANALYZER_SETTING, NULL, 0);
 }
 
@@ -316,11 +313,11 @@ int Send_Start_Measurement(int Interval, int* pCha_IDs, int Cha_Num) {
 	return result;
 }
 
-int Stop_DCS_Measurement() {
+int Stop_DCS_Measurement(void) {
 	return Send_Stop_Measurement();
 }
 
-int Send_Stop_Measurement() {
+int Send_Stop_Measurement(void) {
 	return Send_DCS_Command(STOP_MEASUREMENT, NULL, 0);
 }
 
@@ -345,11 +342,11 @@ int Send_Enable_DCS(bool bCorr, bool bAnalyzer) {
 	return result;
 }
 
-int Get_Simulated_Correlation() {
+int Get_Simulated_Correlation(void) {
 	return Send_Get_Simulated_Correlation();
 }
 
-int Send_Get_Simulated_Correlation() {
+int Send_Get_Simulated_Correlation(void) {
 	return Send_DCS_Command(GET_SIMULATED_DATA, NULL, 0);
 }
 
@@ -456,11 +453,11 @@ int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Para
 	return result;
 }
 
-int Get_Analyzer_Prefit_Param() {
+int Get_Analyzer_Prefit_Param(void) {
 	return Send_Get_Analyzer_Prefit_Param();
 }
 
-int Send_Get_Analyzer_Prefit_Param() {
+int Send_Get_Analyzer_Prefit_Param(void) {
 	return Send_DCS_Command(GET_ANALYZER_PREFIT_PARAM, NULL, 0);
 }
 
@@ -545,10 +542,10 @@ int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize) {
 	//Add checksum calculated from 2(Header) + 4(Type ID) + 4(Data ID) + BufferSize
 	pTransmission->pFrame[10 + BufferSize] = compute_checksum(pTransmission->pFrame, size - 1);
 
-	return send_data_and_handle(pTransmission);
+	return Enqueue_Trans_FIFO(pTransmission);
 }
 
-unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size) {
+inline unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size) {
 	unsigned __int8 xor_sum = 0;
 	for (size_t index = 0; index < size; index++) {
 		xor_sum ^= pDataBuf[index];
@@ -557,7 +554,7 @@ unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size) {
 	return xor_sum;
 }
 
-bool check_checksum(char* pDataBuf, size_t size) {
+inline bool check_checksum(char* pDataBuf, size_t size) {
 	unsigned __int8 xor_sum = 0;
 	for (size_t index = 0; index < size; index++) {
 		xor_sum ^= pDataBuf[index];
@@ -566,246 +563,10 @@ bool check_checksum(char* pDataBuf, size_t size) {
 	return xor_sum == 0x00;
 }
 
-int send_data_and_handle(Transmission_Data_Type* data_to_send) {
-	WSADATA wsaData;
-	SOCKET ConnectSocket = INVALID_SOCKET;
-	struct addrinfo* result = NULL,
-		* ptr = NULL,
-		hints;
-	char recvbuf[DEFAULT_BUFLEN];
-	int iResult;
-	int recvbuflen = DEFAULT_BUFLEN;
-
-	//Initialize Winsock
-	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (iResult != 0) {
-		printf("WSAStartup failed with error: %d\n", iResult);
-		return 1;
-	}
-
-	ZeroMemory(&hints, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-
-	//Resolve the server address and port
-	iResult = getaddrinfo(HOST_NAME, DEFAULT_PORT, &hints, &result);
-	if (iResult != 0) {
-		printf("getaddrinfo failed with error: %d\n", iResult);
-		WSACleanup();
-		return 1;
-	}
-
-	//Attempt to connect to an address until one succeeds
-	for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
-
-		//Create a SOCKET for connecting to server
-		ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-		if (ConnectSocket == INVALID_SOCKET) {
-			printf("socket failed with error: %ld\n", WSAGetLastError());
-			WSACleanup();
-			return 1;
-		}
-
-		// Connect to server.
-		iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
-		if (iResult == SOCKET_ERROR) {
-			printf("connection to server failed - failed with error: %ld\n", WSAGetLastError());
-			closesocket(ConnectSocket);
-			ConnectSocket = INVALID_SOCKET;
-			continue;
-		}
-		//printf("connected to server\n");
-		break;
-	}
-
-	freeaddrinfo(result);
-
-	if (ConnectSocket == INVALID_SOCKET) {
-		printf("Unable to connect to server!\n");
-		WSACleanup();
-		return 1;
-	}
-
-	//Prepend frame size (excluding itself) to the frame
-	char* tmp;
-	tmp = realloc(data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size));
-	if (tmp == NULL) {
-		free(data_to_send->pFrame);
-		return MEMORY_ALLOCATION_ERROR;
-	}
-
-	data_to_send->pFrame = tmp;
-	
-	//Shift pFrame sizeof(data_to_send->size) bytes
-	memmove(&data_to_send->pFrame[sizeof(data_to_send->size)], data_to_send->pFrame, data_to_send->size);
-
-#pragma warning (disable: 6386)
-	//Write prepended data_to_send->size on the packet
-	memcpy(data_to_send->pFrame, &data_to_send->size, sizeof(data_to_send->size));
-#pragma warning (default: 6386)
-
-	hexDump("Data packet", data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size));
-	iResult = send(ConnectSocket, data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size), 0);
-	if (iResult == SOCKET_ERROR) {
-		printf("send failed with error: %d\n", WSAGetLastError());
-		closesocket(ConnectSocket);
-		WSACleanup();
-		return 1;
-	}
-	free(data_to_send->pFrame);
-	free(data_to_send);
-
-	printf("Bytes Sent: %ld\n", iResult);
-
-	//Shutdown the connection since no more data will be sent
-	iResult = shutdown(ConnectSocket, SD_SEND);
-	if (iResult == SOCKET_ERROR) {
-		printf("shutdown failed with error: %d\n", WSAGetLastError());
-		closesocket(ConnectSocket);
-		WSACleanup();
-		return 1;
-	}
-
-	char* frame_data = NULL;
-	unsigned int frame_data_size = 0;
-
-	//Receive until the peer closes the connection
-	do {
-		iResult = recv(ConnectSocket, recvbuf, recvbuflen, 0);
-		if (iResult > 0) {
-			frame_data_size += iResult;
-
-			char* tmp = realloc(frame_data, frame_data_size);
-			if (tmp == NULL) {
-				free(frame_data);
-				return MEMORY_ALLOCATION_ERROR;
-			}
-
-			frame_data = tmp;
-
-			memcpy(&frame_data[frame_data_size - iResult], recvbuf, iResult);
-		}
-		else if (iResult == 0) {
-			printf("Connection closed\n");
-		}
-		else {
-			printf("recv failed with error: %d\n", WSAGetLastError());
-		}
-
-	} while (iResult > 0);
-
-	hexDump("recv", frame_data, frame_data_size);
-
-	for (unsigned __int32 totLen = 0; totLen < frame_data_size;) {
-		//Strip off 32 bit integer size from beginning of frame to make well-defined DCS frame `buff`
-		unsigned __int32 frameLen;
-		memcpy(&frameLen, &frame_data[totLen], sizeof(frameLen));
-
-		char* buff = &frame_data[sizeof(frameLen) + totLen];
-		int tmpiResult = process_recv(buff, frameLen);
-		if (tmpiResult != NO_DCS_ERROR) {
-			iResult = tmpiResult;
-		}
-
-		totLen += sizeof(frameLen) + frameLen;
-		//printf("%d", iResult);
-	}
-	free(frame_data);
-
-	//Cleanup
-	closesocket(ConnectSocket);
-	WSACleanup();
-
-	return iResult;
-}
-
-int process_recv(char* buff, unsigned __int32 buffLen) {
-	hexDump("process_recv", buff, buffLen);
-
-	//Verify checksum
-	if (!check_checksum(buff, buffLen)) {
-		printf("Checksum error\n");
-		return FRAME_CHECKSUM_ERROR;
-	}
-
-	//Ensure header is correct
-	unsigned __int16 header;
-	memcpy(&header, &buff[0], HEADER_SIZE);
-	header = itohs(header);
-	if (header != FRAME_VERSION) {
-		printf("Invalid header\n");
-		return FRAME_VERSION_ERROR;
-	}
-
-
-	//Ensure type id is correct
-	unsigned __int32 type_id;
-	memcpy(&type_id, &buff[2], TYPE_ID_SIZE);
-	type_id = itohl(type_id);
-	if (type_id != DATA_ID) {
-		printf("Invalid Type ID\n");
-		return FRAME_INVALID_DATA;
-	}
-
-	//Call correct callbacks based on data id
-	Data_ID data_id;
-	memcpy(&data_id, &buff[6], DATA_ID_SIZE);
-	data_id = itohl(data_id);
-
-	unsigned int pDataBuffLen = buffLen - DATA_ID_SIZE - TYPE_ID_SIZE - HEADER_SIZE - CHECKSUM_SIZE;
-	char* pDataBuff = malloc(pDataBuffLen);
-	if (pDataBuff == NULL) {
-		return MEMORY_ALLOCATION_ERROR;
-	}
-
-	memcpy(pDataBuff, &buff[10], pDataBuffLen);
-
-	int err = NO_DCS_ERROR;
-	switch (data_id) {
-	case GET_DCS_STATUS:
-		err = Receive_DCS_Status(pDataBuff);
-		break;
-
-	case GET_CORRELATOR_SETTING:
-		err = Receive_Correlator_Setting(pDataBuff);
-		break;
-
-	case GET_ANALYZER_SETTING:
-		err = Receive_Analyzer_Setting(pDataBuff);
-		break;
-
-	case GET_SIMULATED_DATA:
-		err = Receive_Simulated_Correlation(pDataBuff);
-		break;
-
-	case GET_ANALYZER_PREFIT_PARAM:
-		err = Receive_Analyzer_Prefit_Param(pDataBuff);
-		break;
-
-	case COMMAND_ACK:
-		err = Receive_Command_ACK(pDataBuff);
-		break;
-
-	case GET_ERROR_MESSAGE:
-		err = Receive_Error_Message(pDataBuff);
-		break;
-
-	default:
-		printf(ANSI_COLOR_RED"Invalid Data ID\n"ANSI_COLOR_RESET);
-		err = FRAME_INVALID_DATA;
-	}
-
-	free(pDataBuff);
-
-	return err;
-}
-
-
 ////////////////////////////////
 //Endianess management functions
 ////////////////////////////////
-static inline bool should_swap_htoo() {
+static inline bool should_swap_htoo(void) {
 	if (!IS_BIG_ENDIAN && ENDIANESS_OUTPUT == BIG_ENDIAN) {
 		return true;
 	}
@@ -815,7 +576,7 @@ static inline bool should_swap_htoo() {
 	return false;
 }
 
-static inline bool should_swap_itoh() {
+static inline bool should_swap_itoh(void) {
 	if (!IS_BIG_ENDIAN && ENDIANESS_INPUT == BIG_ENDIAN) {
 		return true;
 	}
@@ -840,42 +601,42 @@ static inline float swap_float(const float inFloat) {
 	return retVal;
 }
 
-u_long htool(u_long hostlong) {
+inline u_long htool(u_long hostlong) {
 	if (should_swap_htoo()) {
 		return Swap32(hostlong);
 	}
 	return hostlong;
 }
 
-u_short htoos(u_short hostshort) {
+inline u_short htoos(u_short hostshort) {
 	if (should_swap_htoo()) {
 		return Swap16(hostshort);
 	}
 	return hostshort;
 }
 
-float htoof(float value) {
+inline float htoof(float value) {
 	if (should_swap_htoo()) {
 		return swap_float(value);
 	}
 	return value;
 }
 
-u_long itohl(u_long ilong) {
+inline u_long itohl(u_long ilong) {
 	if (should_swap_itoh()) {
 		return Swap32(ilong);
 	}
 	return ilong;
 }
 
-u_short itohs(u_short ishort) {
+inline u_short itohs(u_short ishort) {
 	if (should_swap_itoh()) {
 		return Swap16(ishort);
 	}
 	return ishort;
 }
 
-float itohf(float value) {
+inline float itohf(float value) {
 	if (should_swap_itoh()) {
 		return swap_float(value);
 	}
