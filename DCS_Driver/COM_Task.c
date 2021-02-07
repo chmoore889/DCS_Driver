@@ -30,6 +30,8 @@ static inline void release_FIFO_mutex(void);
 
 //Sends data passed to function and releases it when finished.
 static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send);
+
+//Receives data from socket. Returns >0 on fatal error, <0 on non-fatal error.
 static int recv_data(SOCKET ConnectSocket);
 
 static int process_recv(char* buff, unsigned __int32 buffLen);
@@ -69,6 +71,7 @@ int Destroy_COM_Task() {
 
 		WaitForSingleObject(threadHandle, INFINITE);
 
+		WaitForSingleObject(hRunMutex, INFINITE);
 		CloseHandle(hRunMutex);
 
 		close_FIFO_mutex();
@@ -138,12 +141,23 @@ static int recv_data(SOCKET ConnectSocket) {
 
 			memcpy(&frame_data[frame_data_size - iResult], socket_buffer, iResult);
 		}
+		else if (iResult == 0) {
+			printf("Connection closed\n");
+		}
 		else if (iResult < 0) {
-			printf("recv failed with error: %d\n", WSAGetLastError());
+			int err = WSAGetLastError();
+			if (err == WSAEWOULDBLOCK) {
+				break;
+			}
+			else {
+				printf("recv failed with error: %d\n", WSAGetLastError());
+			}
 		}
 	} while (iResult > 0);
 
-	hexDump("recv", frame_data, frame_data_size);
+	if (frame_data_size > 0) {
+		hexDump("recv", frame_data, frame_data_size);
+	}
 
 	for (unsigned __int32 totLen = 0; totLen < frame_data_size;) {
 		//Strip off 32 bit integer size from beginning of frame to make well-defined DCS frame `buff`
@@ -231,6 +245,13 @@ static void COM_Task(void* address) {
 		return;
 	}
 
+	//Make the socket non-blocking.
+	u_long iMode = 1;
+	iResult = ioctlsocket(ConnectSocket, FIONBIO, &iMode);
+	if (iResult != NO_ERROR) {
+		printf("ioctlsocket failed with error: %ld\n", iResult);
+	}
+
 	//Repeat while RunMutex is still taken.
 	while (WaitForSingleObject(hRunMutex, 50) == WAIT_TIMEOUT) {
 		Transmission_Data_Type* data_to_send = Dequeue_Trans_FIFO();
@@ -239,12 +260,21 @@ static void COM_Task(void* address) {
 		}
 
 		iResult = recv_data(ConnectSocket);
+
+		if (iResult > 0) {
+			printf(ANSI_COLOR_RED"Fatal Receive Error\n"ANSI_COLOR_RESET);
+			WSACleanup();
+
+			_endthread();
+			return;
+		}
 	}
 
 	//Cleanup
 	closesocket(ConnectSocket);
 	WSACleanup();
 
+	ReleaseMutex(hRunMutex);
 	_endthread();
 }
 

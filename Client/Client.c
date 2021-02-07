@@ -4,6 +4,7 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <windows.h>
 
 #include "DCS_Driver.h"
 
@@ -170,6 +171,8 @@ int main(void) {
 #if FUNC_TO_TEST == 11
 	result = Get_Analyzer_Prefit_Param();
 #endif // 11
+
+	Sleep(2000);
 
 	Destroy_COM_Task();
 	return result;
