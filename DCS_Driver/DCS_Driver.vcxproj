@@ -139,10 +139,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClInclude Include="COM_Task.h" />
     <ClInclude Include="DCS_Driver.h" />
     <ClInclude Include="Internal.h" />
   </ItemGroup>
   <ItemGroup>
+    <ClCompile Include="COM_Task.c" />
     <ClCompile Include="DCS_Driver.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />

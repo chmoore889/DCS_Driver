@@ -21,5 +21,8 @@
     <ClCompile Include="..\DCS_Driver\DCS_Driver.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="..\DCS_Driver\COM_Task.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

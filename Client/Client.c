@@ -4,11 +4,14 @@
 #include <stdbool.h>
 #include <stdio.h>
 #include <string.h>
+#include <windows.h>
 
 #include "DCS_Driver.h"
 
-#define TEST_ARRAY_LEN 6
+#define DEFAULT_PORT "50000"
+#define HOST_NAME "129.49.117.79"
 
+#define TEST_ARRAY_LEN 6
 #define FUNC_TO_TEST 1
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
@@ -75,6 +78,15 @@ int main(void) {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
 	int result = 0;
+
+	DCS_Address address = {
+			.address = HOST_NAME,
+			.port = DEFAULT_PORT,
+	};
+	result = Initialize_COM_Task(address);
+	if (result != NO_DCS_ERROR) {
+		return result;
+	}
 
 #if FUNC_TO_TEST == 0
 	result = Get_DCS_Status();
@@ -160,5 +172,8 @@ int main(void) {
 	result = Get_Analyzer_Prefit_Param();
 #endif // 11
 
+	Sleep(2000);
+
+	Destroy_COM_Task();
 	return result;
 }

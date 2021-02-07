@@ -1,4 +1,5 @@
 #pragma once
+#include <WinSock2.h>
 
 enum Endianess
 {
@@ -85,7 +86,7 @@ host and the remote DCS. GET IDs are for the data from the DCS*/
 typedef unsigned __int32 Data_ID;
 
 typedef struct Transmission_Data_Type {
-	int size; //Size of the transmission buffer
+	unsigned int size; //Size of the transmission buffer
 	char* pFrame; //Pointer to the transmission buffer
 	struct Transmission_Data_Type* pNextItem; //Pointer for the FIFO
 } Transmission_Data_Type;
@@ -93,7 +94,7 @@ typedef struct Transmission_Data_Type {
 //This function is called by the function Get_DCS_Status. It calls the function
 //Send_DCS_Command to send the “Get DCS Status” command to the DCS. The Status data will
 //be received by the function Receive_DCS_Status.
-int Send_Get_DSC_Status();
+int Send_Get_DSC_Status(void);
 int Receive_DCS_Status(char* pDataBuf);
 
 int Send_Correlator_Setting(Correlator_Setting_Type* pCorrelator_Setting);
@@ -101,7 +102,7 @@ int Send_Correlator_Setting(Correlator_Setting_Type* pCorrelator_Setting);
 //This function is called by the function Get_Correlator_Setting. It calls the function
 //Send_DCS_Command to send the “Get Correlator Settings” command to the DCS. The data will
 //be received by the function Receive_Correlator_Setting.
-int Send_Get_Correlator_Setting();
+int Send_Get_Correlator_Setting(void);
 int Receive_Correlator_Setting(char* pDataBuf);
 
 int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
@@ -109,16 +110,17 @@ int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num)
 //This function is called by the function Get_Analyzer_Setting. It calls the function
 //Send_DCS_Command to send the “Get Analyzer Settings” command to the DCS. The data will
 //be received by the function Receive_Analyzer_Setting.
-int Send_Get_Analyzer_Setting();
+int Send_Get_Analyzer_Setting(void);
 int Receive_Analyzer_Setting(char* pDataBuf);
 
 int Send_Start_Measurement(int Interval, int* pCha_IDs, int Cha_Num);
 
-int Send_Stop_Measurement();
+int Send_Stop_Measurement(void);
 
 int Send_Enable_DCS(bool bCorr, bool bAnalyzer);
 
-int Send_Get_Simulated_Correlation();
+int Send_Get_Simulated_Correlation(void);
+int Receive_Simulated_Correlation(char* pDataBuf);
 
 int Send_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num);
 
@@ -127,7 +129,7 @@ int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Para
 //This function is called by the function Get_Analyzer_Prefit_Param. It calls the function
 //Send_DCS_Command to send the “Get Analyzer Prefit Param” command to the DCS. The data will
 //be received by the function Receive_Analyzer_Prefit_Param.
-int Send_Get_Analyzer_Prefit_Param();
+int Send_Get_Analyzer_Prefit_Param(void);
 int Receive_Analyzer_Prefit_Param(char* pDataBuf);
 
 int Receive_Error_Message(char* pDataBuf);
@@ -141,5 +143,5 @@ int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize);
 unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size);
 bool check_checksum(char* pDataBuf, size_t size);
 
-int send_data_and_handle(Transmission_Data_Type* data_to_send);
-int process_recv(char* buff, unsigned __int32 buffLen);
+//Prints out data at addr in hex format in debug build.
+void hexDump(const char* desc, const void* addr, const int len);

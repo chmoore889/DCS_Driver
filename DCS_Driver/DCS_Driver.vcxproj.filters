@@ -21,9 +21,15 @@
     <ClInclude Include="Internal.h">
       <Filter>Header Files</Filter>
     </ClInclude>
+    <ClInclude Include="COM_Task.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
   </ItemGroup>
   <ItemGroup>
     <ClCompile Include="DCS_Driver.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="COM_Task.c">
       <Filter>Source Files</Filter>
     </ClCompile>
   </ItemGroup>
