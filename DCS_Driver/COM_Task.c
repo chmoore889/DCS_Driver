@@ -121,7 +121,7 @@ static int recv_data(SOCKET ConnectSocket) {
 	char* frame_data = NULL;
 	unsigned int frame_data_size = 0;
 
-	//Receive until the peer closes the connection
+	//Receives data waiting in buffer. Continues if no data available.
 	do {
 		iResult = recv(ConnectSocket, socket_buffer, sizeof(socket_buffer), 0);
 		if (iResult > 0) {
@@ -145,6 +145,7 @@ static int recv_data(SOCKET ConnectSocket) {
 			printf("Connection closed\n");
 		}
 		else if (iResult < 0) {
+			//Socket should be set to non-blocking. This handles the would block error as success.
 			int err = WSAGetLastError();
 			if (err == WSAEWOULDBLOCK) {
 				break;
@@ -178,6 +179,8 @@ static int recv_data(SOCKET ConnectSocket) {
 	return iResult;
 }
 
+//Function run by the COM task thread. Initiates connection to the DCS
+//and then continuously sends and receives data until Destroy_COM_Task is called.
 static void COM_Task(void* address) {
 	DCS_Address* dcs_address = (DCS_Address*)address;
 
