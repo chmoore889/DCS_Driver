@@ -178,7 +178,7 @@ int Receive_Correlator_Setting(char* pDataBuf) {
 	memcpy(&pCorrelator_Setting->Scale, &Scale, sizeof(Scale));
 
 	//Reverse Corr_Time calculation
-	float Corr_Time = (float) 2e-7 * Sample_Size * Data_N;
+	float Corr_Time = (float)2e-7 * Sample_Size * Data_N;
 	memcpy(&pCorrelator_Setting->Corr_Time, &Corr_Time, sizeof(Corr_Time));
 
 	Get_Correlator_Setting_CB(pCorrelator_Setting);
