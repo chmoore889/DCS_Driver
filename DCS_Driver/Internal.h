@@ -144,4 +144,4 @@ unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size);
 bool check_checksum(char* pDataBuf, size_t size);
 
 //Prints out data at addr in hex format in debug build.
-inline void hexDump(const char* desc, const void* addr, const int len);
+void hexDump(const char* desc, const void* addr, const int len);

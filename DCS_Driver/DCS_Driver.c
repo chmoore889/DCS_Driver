@@ -16,7 +16,7 @@
 #define DEFAULT_PORT "50000"
 #define HOST_NAME "129.49.117.79"
 
-inline void hexDump(const char* desc, const void* addr, const int len) {
+void hexDump(const char* desc, const void* addr, const int len) {
 #if defined(_DEBUG)
 	int i;
 	unsigned char buff[17];
@@ -545,7 +545,7 @@ int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize) {
 	return Enqueue_Trans_FIFO(pTransmission);
 }
 
-inline unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size) {
+unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size) {
 	unsigned __int8 xor_sum = 0;
 	for (size_t index = 0; index < size; index++) {
 		xor_sum ^= pDataBuf[index];
@@ -554,7 +554,7 @@ inline unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size) {
 	return xor_sum;
 }
 
-inline bool check_checksum(char* pDataBuf, size_t size) {
+bool check_checksum(char* pDataBuf, size_t size) {
 	unsigned __int8 xor_sum = 0;
 	for (size_t index = 0; index < size; index++) {
 		xor_sum ^= pDataBuf[index];
@@ -601,42 +601,42 @@ static inline float swap_float(const float inFloat) {
 	return retVal;
 }
 
-inline u_long htool(u_long hostlong) {
+u_long htool(u_long hostlong) {
 	if (should_swap_htoo()) {
 		return Swap32(hostlong);
 	}
 	return hostlong;
 }
 
-inline u_short htoos(u_short hostshort) {
+u_short htoos(u_short hostshort) {
 	if (should_swap_htoo()) {
 		return Swap16(hostshort);
 	}
 	return hostshort;
 }
 
-inline float htoof(float value) {
+float htoof(float value) {
 	if (should_swap_htoo()) {
 		return swap_float(value);
 	}
 	return value;
 }
 
-inline u_long itohl(u_long ilong) {
+u_long itohl(u_long ilong) {
 	if (should_swap_itoh()) {
 		return Swap32(ilong);
 	}
 	return ilong;
 }
 
-inline u_short itohs(u_short ishort) {
+u_short itohs(u_short ishort) {
 	if (should_swap_itoh()) {
 		return Swap16(ishort);
 	}
 	return ishort;
 }
 
-inline float itohf(float value) {
+float itohf(float value) {
 	if (should_swap_itoh()) {
 		return swap_float(value);
 	}

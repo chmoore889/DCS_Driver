@@ -159,6 +159,7 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="..\DCS_Driver\COM_Task.c" />
     <ClCompile Include="..\DCS_Driver\DCS_Driver.c" />
     <ClCompile Include="Client.c" />
   </ItemGroup>
