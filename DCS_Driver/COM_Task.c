@@ -7,14 +7,18 @@
 
 #include "DCS_Driver.h"
 #include "Internal.h"
+#include "COM_Task.h"
 
 // Pointer to the transmission FIFO head
 static Transmission_Data_Type* pTrans_FIFO_Head = NULL;
 // Pointer to the transmission FIFO tail
 static Transmission_Data_Type* pTrans_FIFO_Tail = NULL;
 
+//Handle of the COM task thread.
 static HANDLE threadHandle;
+//Handle of the mutex for destroying the COM task.
 static HANDLE hRunMutex;
+//Handle of the mutex for adding to the FIFO queue.
 static HANDLE hFIFOMutex;
 
 //Removes the first item in the FIFO and returns its pointer.
@@ -23,9 +27,13 @@ static Transmission_Data_Type* Dequeue_Trans_FIFO(void);
 //Work done by the COM task thread.
 static void COM_Task(void* address);
 
+//Initializes the handle for hFIFOMutex.
 static int init_FIFO_mutex(void);
+//Releases the handle for hFIFOMutex.
 static int close_FIFO_mutex(void);
+//Takes control of the hFIFOMutex.
 static inline void set_FIFO_mutex(void);
+//Releases control of the hFIFOMutex.
 static inline void release_FIFO_mutex(void);
 
 //Sends data passed to function and releases it when finished.
@@ -34,9 +42,11 @@ static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send)
 //Receives data from socket. Returns >0 on fatal error, <0 on non-fatal error.
 static int recv_data(SOCKET ConnectSocket);
 
+//Processes the raw data from the DCS. Takes a pointer to a DCS frame *excluding* the prepended frame size.
 static int process_recv(char* buff, unsigned __int32 buffLen);
 
 int Initialize_COM_Task(DCS_Address address) {
+	//Return immediatly if a COM task already exists.
 	if (threadHandle != NULL || hRunMutex != NULL) {
 		return THREAD_ALREADY_EXISTS;
 	}
@@ -54,6 +64,7 @@ int Initialize_COM_Task(DCS_Address address) {
 		return result;
 	}
 
+	//Start the COM task thread, calling the COM_Task function.
 	threadHandle = (HANDLE)_beginthread(COM_Task, 0, &address);
 	if (threadHandle == NULL || PtrToLong(threadHandle) == -1L) {
 		CloseHandle(hRunMutex);
@@ -66,6 +77,7 @@ int Initialize_COM_Task(DCS_Address address) {
 }
 
 int Destroy_COM_Task() {
+	//If the COM task isn't already stopped, free all the task's resources.
 	if (hRunMutex != NULL) {
 		ReleaseMutex(hRunMutex);
 
@@ -83,7 +95,7 @@ int Destroy_COM_Task() {
 }
 
 static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send) {
-	//Prepend frame size (excluding itself) to the frame
+	//Allocate more memory in preparation for prepending frame size (excluding itself) to the frame.
 	char* tmp = realloc(data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size));
 	if (tmp == NULL) {
 		free(data_to_send->pFrame);
@@ -92,15 +104,16 @@ static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send)
 
 	data_to_send->pFrame = tmp;
 
-	//Shift pFrame sizeof(data_to_send->size) bytes
+	//Shift pFrame sizeof(data_to_send->size) bytes to give space for the prepended frame size.
 	memmove(&data_to_send->pFrame[sizeof(data_to_send->size)], data_to_send->pFrame, data_to_send->size);
 
 #pragma warning (disable: 6386)
-	//Write prepended data_to_send->size on the packet
+	//Write prepended data_to_send->size on the packet.
 	memcpy(data_to_send->pFrame, &data_to_send->size, sizeof(data_to_send->size));
 #pragma warning (default: 6386)
 
 	hexDump("Data packet", data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size));
+	//Send the data over the socket. data_to_send->size was not modified when prepending the frame size so it is added here.
 	int iResult = send(ConnectSocket, data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size), 0);
 	if (iResult == SOCKET_ERROR) {
 		printf("send failed with error: %d\n", WSAGetLastError());
@@ -121,10 +134,11 @@ static int recv_data(SOCKET ConnectSocket) {
 	char* frame_data = NULL;
 	unsigned int frame_data_size = 0;
 
-	//Receives data waiting in buffer. Continues if no data available.
+	//Receives data waiting in buffer. Continues if no data available as socket is non-blocking.
 	do {
 		iResult = recv(ConnectSocket, socket_buffer, sizeof(socket_buffer), 0);
 		if (iResult > 0) {
+			//Data is available. Write it to the frame_data buffer.
 			frame_data_size += iResult;
 
 			char* tmp = realloc(frame_data, frame_data_size);
@@ -145,13 +159,13 @@ static int recv_data(SOCKET ConnectSocket) {
 			printf("Connection closed\n");
 		}
 		else if (iResult < 0) {
-			//Socket should be set to non-blocking. This handles the would block error as success.
+			//Socket should be set to non-blocking. This handles the would block error as success. Fails normally otherwise.
 			int err = WSAGetLastError();
 			if (err == WSAEWOULDBLOCK) {
 				break;
 			}
 			else {
-				printf("recv failed with error: %d\n", WSAGetLastError());
+				printf("recv failed with error: %d\n", err);
 			}
 		}
 	} while (iResult > 0);
@@ -160,6 +174,7 @@ static int recv_data(SOCKET ConnectSocket) {
 		hexDump("recv", frame_data, frame_data_size);
 	}
 
+	//Loop over each frame that's available as multiple may have been received at once.
 	for (unsigned __int32 totLen = 0; totLen < frame_data_size;) {
 		//Strip off 32 bit integer size from beginning of frame to make well-defined DCS frame `buff`
 		unsigned __int32 frameLen;
@@ -248,14 +263,14 @@ static void COM_Task(void* address) {
 		return;
 	}
 
-	//Make the socket non-blocking.
+	//Make the socket non-blocking for convenience when receiving data in the COM thread.
 	u_long iMode = 1;
 	iResult = ioctlsocket(ConnectSocket, FIONBIO, &iMode);
 	if (iResult != NO_ERROR) {
 		printf("ioctlsocket failed with error: %ld\n", iResult);
 	}
 
-	//Repeat while RunMutex is still taken.
+	//Repeat while RunMutex is still taken by the main thread. Clean up and exit when it's released.
 	while (WaitForSingleObject(hRunMutex, 50) == WAIT_TIMEOUT) {
 		Transmission_Data_Type* data_to_send = Dequeue_Trans_FIFO();
 		if (data_to_send != NULL) {
@@ -279,6 +294,19 @@ static void COM_Task(void* address) {
 
 	ReleaseMutex(hRunMutex);
 	_endthread();
+}
+
+int Command_Rsp_Count;
+int Command_Sent;
+bool Command_Ack;
+
+int Check_Command_Response(int Option, int Command_Code) {
+	if (Option == COMMAND_RSP_RESET) {
+		Command_Rsp_Count = MAX_COMMAND_RESPONSE_TIME;
+		Command_Ack = true;
+		return 0;
+	}
+
 }
 
 int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission) {

@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <stdbool.h>
 
@@ -61,6 +61,13 @@ typedef struct {
 	float mua0; // light absorption coefficient (1/cm)
 	float musp; // light scattering coefficient (1/cm)
 } Optical_Param_Type;
+
+typedef struct {
+	int Cha_ID; // Channel ID
+	float BFI; // absolute blood flow index
+	float Beta; // β value in the fitting
+	float rMSE; // relative mean square error
+} BFI_Data_Type;
 
 //Structure for DCS address data.
 typedef struct DCS_Address {
@@ -145,3 +152,6 @@ void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Setting)
 
 //Callback for error messages that are received
 void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size);
+
+//Callback for getting BFI data.
+void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num);

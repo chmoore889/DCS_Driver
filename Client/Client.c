@@ -60,6 +60,15 @@ void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
 	printf("]\n");
 }
 
+void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num) {
+	for (int x = 0; x < Cha_Num; x++) {
+		printf("Settings %d\n", x);
+		printf("BFI: %f\n", pBFI_Data[x].BFI);
+		printf("Beta: %f\n", pBFI_Data[x].Beta);
+		printf("rMSE: %f\n", pBFI_Data[x].rMSE);
+	}
+}
+
 void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
 	unsigned __int32 strSize = Size + 1;
 	char* errorString = calloc(strSize, sizeof(char));

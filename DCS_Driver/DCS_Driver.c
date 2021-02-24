@@ -16,6 +16,7 @@
 #define DEFAULT_PORT "50000"
 #define HOST_NAME "129.49.117.79"
 
+//Convenience function for dumping data to stdout in debug builds, but nothing in release.
 void hexDump(const char* desc, const void* addr, const int len) {
 #if defined(_DEBUG)
 	int i;
@@ -510,6 +511,40 @@ int Receive_Command_ACK(char* pDataBuf) {
 	printf(ANSI_COLOR_GREEN"Command Ack: 0x%02x\n"ANSI_COLOR_RESET, commandId);
 
 	return NO_DCS_ERROR;
+}
+
+int Receive_BFI_Data(char* pDataBuf) {
+	//Number of channels to expect in following data.
+	unsigned __int32 numChannels;
+	memcpy(&numChannels, &pDataBuf[0], sizeof(numChannels));
+	numChannels = itohl(numChannels);
+
+	//Pointer to the memory storing the BFI data structure array.
+	BFI_Data_Type* pBFI_Data = malloc(numChannels * sizeof(*pBFI_Data));
+	for (int x = 0; x < numChannels; x++) {
+		//Find index of BFI data in the raw buffer.
+		unsigned __int32 rawDataOffset = sizeof(numChannels) + x * sizeof(*pBFI_Data);
+
+		BFI_Data_Type* currentBFI = &pBFI_Data[x];
+		memcpy(&currentBFI->Cha_ID, &pDataBuf[rawDataOffset], sizeof(currentBFI->Cha_ID));
+		currentBFI->Cha_ID = itohl(currentBFI->Cha_ID);
+		rawDataOffset += sizeof(currentBFI->Cha_ID);
+
+		memcpy(&currentBFI->BFI, &pDataBuf[rawDataOffset], sizeof(currentBFI->BFI));
+		currentBFI->BFI = itohf(currentBFI->BFI);
+		rawDataOffset += sizeof(currentBFI->BFI);
+
+		memcpy(&currentBFI->Beta, &pDataBuf[rawDataOffset], sizeof(currentBFI->Beta));
+		currentBFI->Beta = itohf(currentBFI->Beta);
+		rawDataOffset += sizeof(currentBFI->Beta);
+
+		memcpy(&currentBFI->rMSE, &pDataBuf[rawDataOffset], sizeof(currentBFI->rMSE));
+		currentBFI->rMSE = itohf(currentBFI->rMSE);
+		rawDataOffset += sizeof(currentBFI->rMSE);
+	}
+
+	Get_BFI_Data(pBFI_Data, numChannels);
+	free(pBFI_Data);
 }
 
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize) {

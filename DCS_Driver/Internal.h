@@ -16,9 +16,11 @@ enum Endianess
 //True if the current system is big endian
 #define IS_BIG_ENDIAN (!*(unsigned char *)&(unsigned __int16){1})
 
+//Swaps endianess of 16 bit field
 #define Swap16(data) \
 ( (((data) >> 8) & 0x00FF) | (((data) << 8) & 0xFF00) ) 
 
+//Swaps endianess of 32 bit field
 #define Swap32(data)   \
 ( (((data) >> 24) & 0x000000FF) | (((data) >>  8) & 0x0000FF00) | \
   (((data) <<  8) & 0x00FF0000) | (((data) << 24) & 0xFF000000) ) 
@@ -73,7 +75,7 @@ host and the remote DCS. GET IDs are for the data from the DCS*/
 #define DATA_ID_SIZE 4
 #define CHECKSUM_SIZE 1
 
-//Output colors
+//Standard console output colors for creating colored stdout
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
 #define ANSI_COLOR_YELLOW  "\x1b[33m"
@@ -134,6 +136,7 @@ int Receive_Analyzer_Prefit_Param(char* pDataBuf);
 
 int Receive_Error_Message(char* pDataBuf);
 int Receive_Command_ACK(char* pDataBuf);
+int Receive_BFI_Data(char* pDataBuf);
 
 //This function generates the frame to be sent to the remote DCS.
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize);
