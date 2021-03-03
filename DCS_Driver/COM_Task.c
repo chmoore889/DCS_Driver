@@ -461,8 +461,24 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 		err = Receive_Error_Message(pDataBuff);
 		break;
 
+	case GET_INTENSITY:
+		err = Receive_Intensity_Data(pDataBuff);
+		break;
+
+	case BFI_CORRELATION_READY:
+		err = Receive_BFI_Correlation_Ready();
+		break;
+
+	case GET_BFI_DATA:
+		err = Receive_BFI_Data(pDataBuff);
+		break;
+
+	case GET_BFI_CORRELATION_DATA:
+		err = Receive_Corr_Intensity_Data(pDataBuff);
+		break;
+
 	default:
-		printf(ANSI_COLOR_RED"Invalid Data ID\n"ANSI_COLOR_RESET);
+		printf(ANSI_COLOR_RED"Invalid Data ID: 0x%08X\n"ANSI_COLOR_RESET, data_id);
 		err = FRAME_INVALID_DATA;
 	}
 

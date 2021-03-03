@@ -75,6 +75,18 @@ typedef struct DCS_Address {
 	const char* port; //Port of the DCS
 } DCS_Address;
 
+typedef struct {
+	int Cha_ID; //Channel ID
+	float intensity; //intensity of the optical channel
+	int Data_Num; //number of the correlation value
+	float* pCorrBuf; //pointer to the buffer of the correlation values
+} Corr_Intensity_Data_Type;
+
+typedef struct {
+	int Cha_ID; //Channel ID
+	float intensity; //intensity of the optical channel
+} Intensity_Data_Type;
+
 
 //Public API
 
@@ -155,3 +167,9 @@ void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size);
 
 //Callback for getting BFI data.
 void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num);
+
+//Callback for getting correlation intensity.
+void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);
+
+//Callback for getting intensity data.
+void Get_Intensity_Data_CB(Intensity_Data_Type* pIntensity_Data, int Cha_Num);

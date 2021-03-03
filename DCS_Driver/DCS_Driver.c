@@ -521,7 +521,7 @@ int Receive_BFI_Data(char* pDataBuf) {
 
 	//Pointer to the memory storing the BFI data structure array.
 	BFI_Data_Type* pBFI_Data = malloc(numChannels * sizeof(*pBFI_Data));
-	for (int x = 0; x < numChannels; x++) {
+	for (unsigned int x = 0; x < numChannels; x++) {
 		//Find index of BFI data in the raw buffer.
 		unsigned __int32 rawDataOffset = sizeof(numChannels) + x * sizeof(*pBFI_Data);
 
@@ -545,6 +545,132 @@ int Receive_BFI_Data(char* pDataBuf) {
 
 	Get_BFI_Data(pBFI_Data, numChannels);
 	free(pBFI_Data);
+
+	return NO_DCS_ERROR;
+}
+
+int Receive_Corr_Intensity_Data(char* pDataBuf) {
+	//Index to keep track of where in the buffer we are.
+	size_t dataBufIndex = 0;
+
+	//The pointer to the memory storing the correlation and intensity.
+	Corr_Intensity_Data_Type* pCorr_Intensity_Data;
+
+	unsigned __int32 Cha_Num;
+	memcpy(&Cha_Num, &pDataBuf[dataBufIndex], sizeof(Cha_Num));
+	dataBufIndex += sizeof(Cha_Num);
+
+	//Allocate the memory for the values for each channel.
+	pCorr_Intensity_Data = malloc(Cha_Num * sizeof(*pCorr_Intensity_Data));
+	if (pCorr_Intensity_Data == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	for (unsigned int x = 0; x < Cha_Num; x++) {
+		//Local loop pointer so that the address and array dereference operators do not need to be used every time.
+		Corr_Intensity_Data_Type* local_ptr = &pCorr_Intensity_Data[x];
+
+		unsigned __int32 Cha_ID;
+		memcpy(&Cha_ID, &pDataBuf[dataBufIndex], sizeof(Cha_ID));
+		local_ptr->Cha_ID = itohl(Cha_ID);
+		dataBufIndex += sizeof(Cha_ID);
+
+		float intensity;
+		memcpy(&intensity, &pDataBuf[dataBufIndex], sizeof(intensity));
+		local_ptr->intensity = itohf(intensity);
+		dataBufIndex += sizeof(intensity);
+
+		unsigned __int32 Data_Num;
+		memcpy(&Data_Num, &pDataBuf[dataBufIndex], sizeof(Data_Num));
+		local_ptr->Data_Num = itohl(Data_Num);
+		dataBufIndex += sizeof(Data_Num);
+
+		local_ptr->pCorrBuf = malloc(Data_Num * sizeof(float));
+		if (local_ptr->pCorrBuf == NULL) {
+			return MEMORY_ALLOCATION_ERROR;
+		}
+
+		for (unsigned int y = 0; y < Data_Num; y++) {
+			float val;
+			memcpy(&val, &pDataBuf[dataBufIndex], sizeof(val));
+			dataBufIndex += sizeof(val);
+
+			local_ptr->pCorrBuf[y] = itohf(val);
+		}
+	}
+
+	int Delay_Num;
+	float* pDelayBuf;
+	memcpy(&Delay_Num, &pDataBuf[dataBufIndex], sizeof(Delay_Num));
+	dataBufIndex += sizeof(Delay_Num);
+
+	pDelayBuf = malloc(Delay_Num * sizeof(*pDelayBuf));
+	if (pDelayBuf == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	for (int y = 0; y < Delay_Num; y++) {
+		float val;
+		memcpy(&val, &pDataBuf[dataBufIndex], sizeof(val));
+		dataBufIndex += sizeof(val);
+
+		pDelayBuf[y] = itohf(val);
+	}
+
+	Get_Corr_Intensity_Data_CB(pCorr_Intensity_Data, Cha_Num, pDelayBuf, Delay_Num);
+
+	//Release all previously allocated memory.
+	for (unsigned int x = 0; x < Cha_Num; x++) {
+		free(pCorr_Intensity_Data[x].pCorrBuf);
+	}
+	free(pCorr_Intensity_Data);
+	free(pDelayBuf);
+
+	return NO_DCS_ERROR;
+}
+
+int Receive_Intensity_Data(char* pDataBuf) {
+	//Index to keep track of where in the buffer we are.
+	size_t dataBufIndex = 0;
+
+	//Buffer to store the intensity data.
+	Intensity_Data_Type* pIntensity_Data;
+
+	unsigned __int32 Cha_Num;
+	memcpy(&Cha_Num, &pDataBuf[dataBufIndex], sizeof(Cha_Num));
+	dataBufIndex += sizeof(Cha_Num);
+
+	//Allocate the memory for the values for each channel.
+	pIntensity_Data = malloc(Cha_Num * sizeof(*pIntensity_Data));
+	if (pIntensity_Data == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	for (unsigned int x = 0; x < Cha_Num; x++) {
+		unsigned __int32 Cha_ID;
+		float Intensity;
+
+		memcpy(&Cha_ID, &pDataBuf[dataBufIndex], sizeof(Cha_ID));
+		dataBufIndex += sizeof(Cha_Num);
+
+		memcpy(&Intensity, &pDataBuf[dataBufIndex], sizeof(Intensity));
+		dataBufIndex += sizeof(Intensity);
+
+		pIntensity_Data[x].Cha_ID = itohl(Cha_ID);
+		pIntensity_Data[x].intensity = itohf(Intensity);
+	}
+
+	Get_Intensity_Data_CB(pIntensity_Data, Cha_Num);
+
+	free(pIntensity_Data);
+
+	return NO_DCS_ERROR;
+}
+
+int Receive_BFI_Correlation_Ready() {
+	printf("Received BFI Correlation Ready\n");
+
+	return NO_DCS_ERROR;
 }
 
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize) {

@@ -12,7 +12,7 @@
 #define HOST_NAME "129.49.117.79"
 
 #define TEST_ARRAY_LEN 6
-#define FUNC_TO_TEST 1
+#define FUNC_TO_TEST -1
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("%s\n", bCorr ? "true" : "false");
@@ -83,6 +83,28 @@ void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
 	free(errorString);
 }
 
+void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num) {
+	for (int x = 0; x < Cha_Num; x++) {
+		printf("Cha_ID: %d\n", pCorr_Intensity_Data[x].Cha_ID);
+		printf("Data_Num: %d\n", pCorr_Intensity_Data[x].Data_Num);
+		printf("intensity: %f\n", pCorr_Intensity_Data[x].intensity);
+		for (int y = 0; y < pCorr_Intensity_Data[x].Data_Num; y++) {
+			printf("corr: %f\n", pCorr_Intensity_Data[x].pCorrBuf[y]);
+		}
+	}
+
+	for (int x = 0; x < Delay_Num; x++) {
+		printf("Delay %d: %f\n", x, pDelayBuf[x]);
+	}
+}
+
+void Get_Intensity_Data_CB(Intensity_Data_Type* pIntensity_Data, int Cha_Num) {
+	for (int x = 0; x < Cha_Num; x++) {
+		printf("Cha_ID: %d\n", pIntensity_Data[x].Cha_ID);
+		printf("intensity: %f\n", pIntensity_Data[x].intensity);
+	}
+}
+
 int main(void) {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
@@ -134,14 +156,18 @@ int main(void) {
 	result = Get_Analyzer_Setting();
 #endif // 4
 
-#if FUNC_TO_TEST == 5
-	int ids[] = { 1, 5, 7, 9 };
-	result = Start_DCS_Measurement(5, ids, sizeof(ids) / sizeof(ids[0]));
-#endif // 5
+	result = Enable_DCS(true, true);
 
-#if FUNC_TO_TEST == 6
+//#if FUNC_TO_TEST == 5
+	int ids[] = {1, 2};
+	result = Start_DCS_Measurement(10, ids, sizeof(ids) / sizeof(ids[0]));
+//#endif // 5
+
+	Sleep(2000);
+
+//#if FUNC_TO_TEST == 6
 	result = Stop_DCS_Measurement();
-#endif // 6
+//#endif // 6
 
 #if FUNC_TO_TEST == 7
 	result = Enable_DCS(true, false);
