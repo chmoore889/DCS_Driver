@@ -80,7 +80,7 @@ void hexDump(const char* desc, const void* addr, const int len) {
 #endif
 }
 
-int Get_DCS_Status(void) {
+__declspec(dllexport) int Get_DCS_Status(void) {
 	return Send_Get_DSC_Status();
 }
 
@@ -105,7 +105,7 @@ int Receive_DCS_Status(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
-int Set_Correlator_Setting(Correlator_Setting_Type* pCorr_Setting) {
+__declspec(dllexport) int Set_Correlator_Setting(Correlator_Setting_Type* pCorr_Setting) {
 	return Send_Correlator_Setting(pCorr_Setting);
 }
 
@@ -149,7 +149,7 @@ int Send_Correlator_Setting(Correlator_Setting_Type* pCorrelator_Setting) {
 	return result;
 }
 
-int Get_Correlator_Setting(void) {
+__declspec(dllexport) int Get_Correlator_Setting(void) {
 	return Send_Get_Correlator_Setting();
 }
 
@@ -188,7 +188,7 @@ int Receive_Correlator_Setting(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
-int Set_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num) {
+__declspec(dllexport) int Set_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num) {
 	return Send_Analyzer_Setting(pAnalyzer_Setting, Cha_Num);
 }
 
@@ -232,7 +232,7 @@ int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num)
 	return result;
 }
 
-int Get_Analyzer_Setting(void) {
+__declspec(dllexport) int Get_Analyzer_Setting(void) {
 	return Send_Get_Analyzer_Setting();
 }
 
@@ -273,7 +273,7 @@ int Receive_Analyzer_Setting(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
-int Start_DCS_Measurement(int interval, int* pCha_IDs, int Cha_Num) {
+__declspec(dllexport) int Start_DCS_Measurement(int interval, int* pCha_IDs, int Cha_Num) {
 	return Send_Start_Measurement(interval, pCha_IDs, Cha_Num);
 }
 
@@ -314,7 +314,7 @@ int Send_Start_Measurement(int Interval, int* pCha_IDs, int Cha_Num) {
 	return result;
 }
 
-int Stop_DCS_Measurement(void) {
+__declspec(dllexport) int Stop_DCS_Measurement(void) {
 	return Send_Stop_Measurement();
 }
 
@@ -322,7 +322,7 @@ int Send_Stop_Measurement(void) {
 	return Send_DCS_Command(STOP_MEASUREMENT, NULL, 0);
 }
 
-int Enable_DCS(bool bCorr, bool bAnalyzer) {
+__declspec(dllexport) int Enable_DCS(bool bCorr, bool bAnalyzer) {
 	return Send_Enable_DCS(bCorr, bAnalyzer);
 }
 
@@ -343,7 +343,7 @@ int Send_Enable_DCS(bool bCorr, bool bAnalyzer) {
 	return result;
 }
 
-int Get_Simulated_Correlation(void) {
+__declspec(dllexport) int Get_Simulated_Correlation(void) {
 	return Send_Get_Simulated_Correlation();
 }
 
@@ -384,7 +384,7 @@ int Receive_Simulated_Correlation(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
-int Set_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num) {
+__declspec(dllexport) int Set_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num) {
 	return Send_Optical_Param(pOpt_Param, Cha_Num);
 }
 
@@ -418,7 +418,7 @@ int Send_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num) {
 	return result;
 }
 
-int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param) {
+__declspec(dllexport) int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param) {
 	return Send_Analyzer_Prefit_Param(pAnalyzer_Prefit_Param);
 }
 
@@ -454,7 +454,7 @@ int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Para
 	return result;
 }
 
-int Get_Analyzer_Prefit_Param(void) {
+__declspec(dllexport) int Get_Analyzer_Prefit_Param(void) {
 	return Send_Get_Analyzer_Prefit_Param();
 }
 
@@ -521,7 +521,7 @@ int Receive_BFI_Data(char* pDataBuf) {
 
 	//Pointer to the memory storing the BFI data structure array.
 	BFI_Data_Type* pBFI_Data = malloc(numChannels * sizeof(*pBFI_Data));
-	for (int x = 0; x < numChannels; x++) {
+	for (unsigned __int32 x = 0; x < numChannels; x++) {
 		//Find index of BFI data in the raw buffer.
 		unsigned __int32 rawDataOffset = sizeof(numChannels) + x * sizeof(*pBFI_Data);
 
@@ -545,6 +545,7 @@ int Receive_BFI_Data(char* pDataBuf) {
 
 	Get_BFI_Data(pBFI_Data, numChannels);
 	free(pBFI_Data);
+	return NO_DCS_ERROR;
 }
 
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize) {
@@ -554,8 +555,7 @@ int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize) {
 	}
 
 	//Transmission size = 2(Header) + 4(Type ID) + 4(Data ID) + BufferSize + 1 (Checksum)
-	unsigned int size = 2 + 4 + 4 + BufferSize + 1;
-	pTransmission->size = size;
+	pTransmission->size = 2 + 4 + 4 + BufferSize + 1;
 
 	pTransmission->pFrame = malloc(pTransmission->size);
 	if (pTransmission->pFrame == NULL) {
@@ -575,7 +575,7 @@ int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize) {
 	memcpy(&pTransmission->pFrame[10], pDataBuf, BufferSize);
 
 	//Add checksum calculated from 2(Header) + 4(Type ID) + 4(Data ID) + BufferSize
-	pTransmission->pFrame[10 + BufferSize] = compute_checksum(pTransmission->pFrame, size - 1);
+	pTransmission->pFrame[10 + BufferSize] = compute_checksum(pTransmission->pFrame, pTransmission->size - 1);
 
 	return Enqueue_Trans_FIFO(pTransmission);
 }

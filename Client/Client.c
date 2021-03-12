@@ -12,7 +12,7 @@
 #define HOST_NAME "129.49.117.79"
 
 #define TEST_ARRAY_LEN 6
-#define FUNC_TO_TEST 1
+#define FUNC_TO_TEST 0
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("%s\n", bCorr ? "true" : "false");
@@ -92,7 +92,10 @@ int main(void) {
 			.address = HOST_NAME,
 			.port = DEFAULT_PORT,
 	};
-	result = Initialize_COM_Task(address);
+	result = Initialize_COM_Task(address, (Receive_Callbacks){
+		.Get_BFI_Data = Get_BFI_Data,
+		.Get_DCS_Status_CB = Get_DCS_Status_CB
+	});
 	if (result != NO_DCS_ERROR) {
 		return result;
 	}

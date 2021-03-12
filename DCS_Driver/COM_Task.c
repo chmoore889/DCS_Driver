@@ -45,7 +45,16 @@ static int recv_data(SOCKET ConnectSocket);
 //Processes the raw data from the DCS. Takes a pointer to a DCS frame *excluding* the prepended frame size.
 static int process_recv(char* buff, unsigned __int32 buffLen);
 
-int Initialize_COM_Task(DCS_Address address) {
+static Receive_Callbacks callbacks;
+//Handle of the mutex for adding to the callbacks struct.
+static HANDLE hCallbacksMutex;
+
+//Initializes the handle for hFIFOMutex.
+static int init_Callback_mutex(void);
+//Releases the handle for hFIFOMutex.
+static int close_Callback_mutex(void);
+
+__declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks) {
 	//Return immediatly if a COM task already exists.
 	if (threadHandle != NULL || hRunMutex != NULL) {
 		return THREAD_ALREADY_EXISTS;
@@ -64,11 +73,20 @@ int Initialize_COM_Task(DCS_Address address) {
 		return result;
 	}
 
+	result = init_Callback_mutex();
+	if (result != NO_DCS_ERROR) {
+		CloseHandle(hRunMutex);
+		hRunMutex = NULL;
+		close_FIFO_mutex();
+		return result;
+	}
+
 	//Start the COM task thread, calling the COM_Task function.
 	threadHandle = (HANDLE)_beginthread(COM_Task, 0, &address);
 	if (threadHandle == NULL || PtrToLong(threadHandle) == -1L) {
 		CloseHandle(hRunMutex);
 		close_FIFO_mutex();
+		close_Callback_mutex();
 		threadHandle = NULL;
 		return THREAD_START_ERROR;
 	}
@@ -76,7 +94,7 @@ int Initialize_COM_Task(DCS_Address address) {
 	return NO_DCS_ERROR;
 }
 
-int Destroy_COM_Task() {
+__declspec(dllexport) int Destroy_COM_Task() {
 	//If the COM task isn't already stopped, free all the task's resources.
 	if (hRunMutex != NULL) {
 		ReleaseMutex(hRunMutex);
@@ -87,6 +105,7 @@ int Destroy_COM_Task() {
 		CloseHandle(hRunMutex);
 
 		close_FIFO_mutex();
+		close_Callback_mutex();
 
 		threadHandle = NULL;
 		hRunMutex = NULL;
@@ -306,7 +325,7 @@ int Check_Command_Response(int Option, int Command_Code) {
 		Command_Ack = true;
 		return 0;
 	}
-
+	return 0;
 }
 
 int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission) {
@@ -393,7 +412,7 @@ static inline void release_FIFO_mutex() {
 static int process_recv(char* buff, unsigned __int32 buffLen) {
 	hexDump("process_recv", buff, buffLen);
 
-	//Verify checksum
+	//Verify checksum.
 	if (!check_checksum(buff, buffLen)) {
 		printf("Checksum error\n");
 		return FRAME_CHECKSUM_ERROR;
@@ -409,7 +428,7 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 	}
 
 
-	//Ensure type id is correct
+	//Ensure type id is correct.
 	unsigned __int32 type_id;
 	memcpy(&type_id, &buff[2], TYPE_ID_SIZE);
 	type_id = itohl(type_id);
@@ -418,11 +437,12 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 		return FRAME_INVALID_DATA;
 	}
 
-	//Call correct callbacks based on data id
+	//Get data id to later call correct callbacks based on data id.
 	Data_ID data_id;
 	memcpy(&data_id, &buff[6], DATA_ID_SIZE);
 	data_id = itohl(data_id);
 
+	//Obtain just the data portion of the frame and place in pDataBuff.
 	unsigned int pDataBuffLen = buffLen - DATA_ID_SIZE - TYPE_ID_SIZE - HEADER_SIZE - CHECKSUM_SIZE;
 	char* pDataBuff = malloc(pDataBuffLen);
 	if (pDataBuff == NULL) {
@@ -431,6 +451,7 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 
 	memcpy(pDataBuff, &buff[10], pDataBuffLen);
 
+	//Call correct callbacks based on data id with pDataBuff.
 	int err = NO_DCS_ERROR;
 	switch (data_id) {
 	case GET_DCS_STATUS:
@@ -469,4 +490,74 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 	free(pDataBuff);
 
 	return err;
+}
+
+///////////
+//Callbacks
+///////////
+
+static int init_Callback_mutex() {
+	if (hCallbacksMutex != NULL) {
+		return THREAD_ALREADY_EXISTS;
+	}
+
+	hCallbacksMutex = CreateMutexW(NULL, false, NULL);
+	if (hCallbacksMutex == NULL) {
+		return THREAD_START_ERROR;
+	}
+	return NO_DCS_ERROR;
+}
+
+static int close_Callback_mutex() {
+	if (hCallbacksMutex == NULL) {
+		return NO_DCS_ERROR;
+	}
+
+	int result = CloseHandle(hCallbacksMutex);
+
+	hCallbacksMutex = NULL;
+
+	return result;
+}
+
+static void set_Callbacks(Receive_Callbacks local_callbacks) {
+	WaitForSingleObject(hCallbacksMutex, INFINITE);
+	callbacks = local_callbacks;
+	ReleaseMutex(hCallbacksMutex);
+}
+
+static Receive_Callbacks get_Callbacks() {
+	WaitForSingleObject(hCallbacksMutex, INFINITE);
+	Receive_Callbacks local_callbacks = callbacks;
+	ReleaseMutex(hCallbacksMutex);
+
+	return local_callbacks;
+}
+
+void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
+	get_Callbacks().Get_DCS_Status_CB(bCorr, bAnalyzer, DCS_Cha_Num);
+}
+
+void Get_Correlator_Setting_CB(Correlator_Setting_Type* pCorrelator_Setting) {
+	get_Callbacks().Get_Correlator_Setting_CB(pCorrelator_Setting);
+}
+
+void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num) {
+	get_Callbacks().Get_Analyzer_Setting_CB(pAnalyzer_Setting, Cha_Num);
+}
+
+void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit) {
+	get_Callbacks().Get_Analyzer_Prefit_Param_CB(pAnalyzer_Prefit);
+}
+
+void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
+	get_Callbacks().Get_Simulated_Correlation_CB(Simulated_Corr);
+}
+
+void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num) {
+	get_Callbacks().Get_BFI_Data(pBFI_Data, Cha_Num);
+}
+
+void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
+	get_Callbacks().Get_Error_Message_CB(pMessage, Size);
 }

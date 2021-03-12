@@ -75,83 +75,101 @@ typedef struct DCS_Address {
 	const char* port; //Port of the DCS
 } DCS_Address;
 
+/////////////////////////////////
+//User-defined Callbacks Typedefs
+/////////////////////////////////
+
+//Callback for Get_DCS_Status.
+typedef void(*Get_DCS_Status_CB_Def)(bool bCorr, bool bAnalyzer, int DCS_Cha_Num);
+
+//Callback for Get_Correlator_Setting.
+typedef void(*Get_Correlator_Setting_CB_Def)(Correlator_Setting_Type* pCorrelator_Setting);
+
+//Callback for Get_Analyzer_Setting.
+typedef void(*Get_Analyzer_Setting_CB_Def)(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
+
+//Callback for Get_Simulated_Correlation
+typedef void(*Get_Simulated_Correlation_CB_Def)(Simulated_Corr_Type* Simulated_Corr);
+
+//Callback for Get_Analyzer_Prefit_Param
+typedef void(*Get_Analyzer_Prefit_Param_CB_Def)(Analyzer_Prefit_Param_Type* pAnalyzer_Setting);
+
+//Callback for error messages that are received
+typedef void(*Get_Error_Message_CB_Def)(char* pMessage, unsigned __int32 Size);
+
+//Callback for getting BFI data.
+typedef void(*Get_BFI_Data_Def)(BFI_Data_Type* pBFI_Data, int Cha_Num);
+
+typedef struct {
+	//Callback for Get_DCS_Status.
+	Get_DCS_Status_CB_Def Get_DCS_Status_CB;
+	//Callback for Get_Correlator_Setting.
+	Get_Correlator_Setting_CB_Def Get_Correlator_Setting_CB;
+	//Callback for Get_Analyzer_Setting.
+	Get_Analyzer_Setting_CB_Def Get_Analyzer_Setting_CB;
+	//Callback for Get_Simulated_Correlation
+	Get_Simulated_Correlation_CB_Def Get_Simulated_Correlation_CB;
+	//Callback for Get_Analyzer_Prefit_Param
+	Get_Analyzer_Prefit_Param_CB_Def Get_Analyzer_Prefit_Param_CB;
+	//Callback for error messages that are received
+	Get_Error_Message_CB_Def Get_Error_Message_CB;
+	//Callback for getting BFI data.
+	Get_BFI_Data_Def Get_BFI_Data;
+} Receive_Callbacks;
+
 
 //Public API
 
 //Starts the COM task for the DCS driver. Not necessary to call before other functions,
 //which will be queued up and sent once the task is initialized.
-int Initialize_COM_Task(DCS_Address address);
+__declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks);
 
 //Destroys an already created COM task.
-int Destroy_COM_Task(void);
+__declspec(dllexport) int Destroy_COM_Task(void);
 
 //Initiates the command to retrieve the status of the DCS.
 //The settings data will be sent back by the driver through the callback 
 //function Get_DCS_Status_CB.
-int Get_DCS_Status(void);
+__declspec(dllexport) int Get_DCS_Status(void);
 
 //Configures the correlator settings in the DCS using the data in the array pCorr_Setting.
-int Set_Correlator_Setting(Correlator_Setting_Type* pCorr_Setting);
+__declspec(dllexport) int Set_Correlator_Setting(Correlator_Setting_Type* pCorr_Setting);
 
 //Initiates the command to retrieve the correlator settings in the DCS.
 //The settings data will be sent back by the driver through the callback 
 //function Get_Correlator_Setting_CB.
-int Get_Correlator_Setting(void);
+__declspec(dllexport) int Get_Correlator_Setting(void);
 
 //Configures the analyzer settings in the DCS using the data in the array pAnalyzer_Setting
-int Set_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
+__declspec(dllexport) int Set_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
 
 //Retrieves the last fitted correlation from the DCS.
 //The correlation data will be sent back by the driver through the callback 
 //function Get_Analyzer_Setting_CB.
-int Get_Analyzer_Setting(void);
+__declspec(dllexport) int Get_Analyzer_Setting(void);
 
 //Starts the DCS measurement.
-int Start_DCS_Measurement(int interval, int* pCha_IDs, int Cha_Num);
+__declspec(dllexport) int Start_DCS_Measurement(int interval, int* pCha_IDs, int Cha_Num);
 
 //Stops the DCS measurement.
-int Stop_DCS_Measurement(void);
+__declspec(dllexport) int Stop_DCS_Measurement(void);
 
 //Enables or disables the data output of correlation data and BFI data. Intensity data is
 //always output during measurement scans
-int Enable_DCS(bool bCorr, bool bAnalyzer);
+__declspec(dllexport) int Enable_DCS(bool bCorr, bool bAnalyzer);
 
 //Retrieves the last fitted correlation from the DCS.
 //The correlation data will be sent back by the driver through the callback 
 //function Get_Simulated_Correlation_CB.
-int Get_Simulated_Correlation(void);
+__declspec(dllexport) int Get_Simulated_Correlation(void);
 
 //Sets optical parameters.
-int Set_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num);
+__declspec(dllexport) int Set_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num);
 
 //Configures the analyzer settings in the DCS using the data in the array pAnalyzer_Setting
-int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param);
+__declspec(dllexport) int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param);
 
 //Retrieves the prefit parameters from the DCS.
 //The correlation data will be sent back by the driver through the callback 
 //function Get_Analyzer_Prefit_Param_CB.
-int Get_Analyzer_Prefit_Param(void);
-
-
-//User-defined Callbacks
-
-//Callback for Get_DCS_Status.
-void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num);
-
-//Callback for Get_Correlator_Setting.
-void Get_Correlator_Setting_CB(Correlator_Setting_Type* pCorrelator_Setting);
-
-//Callback for Get_Analyzer_Setting.
-void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
-
-//Callback for Get_Simulated_Correlation
-void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr);
-
-//Callback for Get_Analyzer_Prefit_Param
-void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Setting);
-
-//Callback for error messages that are received
-void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size);
-
-//Callback for getting BFI data.
-void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num);
+__declspec(dllexport) int Get_Analyzer_Prefit_Param(void);
