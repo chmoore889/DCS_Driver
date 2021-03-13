@@ -109,7 +109,7 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, 
 	for (int x = 0; x < Delay_Num; x++) {
 		printf("%f, ", pDelayBuf[x]);
 	}
-	printf("\b\b]");
+	printf("\b\b]\n");
 }
 
 int main(void) {
