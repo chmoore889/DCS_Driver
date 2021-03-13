@@ -55,12 +55,15 @@ static int init_Callback_mutex(void);
 static int close_Callback_mutex(void);
 
 __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks) {
+	//Set the callback functions for receiving data.
+	callbacks = local_callbacks;
+
 	//Return immediatly if a COM task already exists.
 	if (threadHandle != NULL || hRunMutex != NULL) {
 		return THREAD_ALREADY_EXISTS;
 	}
 
-	//Initialize a set mutex
+	//Initialize a set mutex.
 	hRunMutex = CreateMutexW(NULL, true, NULL);
 	if (hRunMutex == NULL) {
 		return THREAD_START_ERROR;
@@ -73,7 +76,6 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 		return result;
 	}
 
-	callbacks = local_callbacks;
 	result = init_Callback_mutex();
 	if (result != NO_DCS_ERROR) {
 		CloseHandle(hRunMutex);
