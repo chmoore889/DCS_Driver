@@ -12,21 +12,24 @@
 #define HOST_NAME "129.49.117.79"
 
 #define TEST_ARRAY_LEN 6
-#define FUNC_TO_TEST 0
+#define FUNC_TO_TEST 12
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
+	printf("DCS Status:\n");
 	printf("%s\n", bCorr ? "true" : "false");
 	printf("%s\n", bAnalyzer ? "true" : "false");
 	printf("%d\n", DCS_Cha_Num);
 }
 
 void Get_Correlator_Setting_CB(Correlator_Setting_Type* pCorrelator_Setting) {
+	printf("Correlator Setting:\n");
 	printf("%f\n%d\n%d\n", pCorrelator_Setting->Corr_Time, pCorrelator_Setting->Data_N, pCorrelator_Setting->Scale);
 }
 
 void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num) {
+	printf("Analyzer Settings:\n");
 	for (int x = 0; x < Cha_Num; x++) {
-		printf("Settings %d\n", x);
+		printf("Setting #%d\n", x);
 		printf("Alpha: %f\n", pAnalyzer_Setting[x].Alpha);
 		printf("Beta: %f\n", pAnalyzer_Setting[x].Beta);
 		printf("Db: %f\n", pAnalyzer_Setting[x].Db);
@@ -38,6 +41,7 @@ void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_N
 }
 
 void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit) {
+	printf("Analyzer Prefit Params:\n");
 	printf("Precut: %d\n", pAnalyzer_Prefit->Precut);
 	printf("PostCut: %d\n", pAnalyzer_Prefit->PostCut);
 	printf("Min_Intensity: %f\n", pAnalyzer_Prefit->Min_Intensity);
@@ -49,6 +53,7 @@ void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit) 
 }
 
 void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
+	printf("Simulated Correlation:\n");
 	printf("Precut: %d\n", Simulated_Corr->Precut);
 	printf("Cha_ID: %d\n", Simulated_Corr->Cha_ID);
 	printf("Data_Num: %d\n", Simulated_Corr->Data_Num);
@@ -61,6 +66,7 @@ void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
 }
 
 void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num) {
+	printf("BFI Data:\n");
 	for (int x = 0; x < Cha_Num; x++) {
 		printf("Settings %d\n", x);
 		printf("BFI: %f\n", pBFI_Data[x].BFI);
@@ -83,6 +89,29 @@ void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
 	free(errorString);
 }
 
+void Get_BFI_Corr_Ready_CB(bool bReady) {
+	printf("BFI Corr Ready: ");
+	printf("%s\n", bReady ? "true" : "false");
+}
+
+void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num) {
+	printf("Corr Intensity Data:\n");
+	for (int x = 0; x < Cha_Num; x++) {
+		printf("Data %d:\n", pCorr_Intensity_Data[x].Cha_ID);
+		printf("\tIntensity: %f\n", pCorr_Intensity_Data[x].intensity);
+		printf("\tCorrelation:\n");
+		for (int y = 0; y < pCorr_Intensity_Data[x].Data_Num; y++) {
+			printf("\t\t%f\n", pCorr_Intensity_Data[x].pCorrBuf[y]);
+		}
+	}
+
+	printf("Delays: [");
+	for (int x = 0; x < Delay_Num; x++) {
+		printf("%f, ", pDelayBuf[x]);
+	}
+	printf("\b\b]");
+}
+
 int main(void) {
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
@@ -92,10 +121,19 @@ int main(void) {
 			.address = HOST_NAME,
 			.port = DEFAULT_PORT,
 	};
-	result = Initialize_COM_Task(address, (Receive_Callbacks){
+	Receive_Callbacks callbacks = {
 		.Get_BFI_Data = Get_BFI_Data,
-		.Get_DCS_Status_CB = Get_DCS_Status_CB
-	});
+		.Get_DCS_Status_CB = Get_DCS_Status_CB,
+		.Get_Correlator_Setting_CB = Get_Correlator_Setting_CB,
+		.Get_Analyzer_Setting_CB = Get_Analyzer_Setting_CB,
+		.Get_Analyzer_Prefit_Param_CB = Get_Analyzer_Prefit_Param_CB,
+		.Get_Simulated_Correlation_CB = Get_Simulated_Correlation_CB,
+		.Get_BFI_Data = Get_BFI_Data,
+		.Get_Error_Message_CB = Get_Error_Message_CB,
+		.Get_BFI_Corr_Ready_CB = Get_BFI_Corr_Ready_CB,
+		.Get_Corr_Intensity_Data_CB = Get_Corr_Intensity_Data_CB,
+	};
+	result = Initialize_COM_Task(address, callbacks);
 	if (result != NO_DCS_ERROR) {
 		return result;
 	}
@@ -141,6 +179,12 @@ int main(void) {
 	int ids[] = { 1, 5, 7, 9 };
 	result = Start_DCS_Measurement(5, ids, sizeof(ids) / sizeof(ids[0]));
 #endif // 5
+	result = Enable_DCS(true, true);
+
+	int ids[] = { 1, 2,};
+	result = Start_DCS_Measurement(5, ids, sizeof(ids) / sizeof(ids[0]));
+	Sleep(5000);
+	result = Stop_DCS_Measurement();
 
 #if FUNC_TO_TEST == 6
 	result = Stop_DCS_Measurement();
@@ -158,9 +202,9 @@ int main(void) {
 	Optical_Param_Type optical_arr[TEST_ARRAY_LEN];
 	for (int x = 0; x < TEST_ARRAY_LEN; x++) {
 		optical_arr[x] = (Optical_Param_Type){
-			.Cha_ID = x + 2,
-			.mua0 = (float) (6.3 - x),
-			.musp = (float) (5.8 - x),
+			.Cha_ID = x,
+			.mua0 = (float) (6.3 - x / 100),
+			.musp = (float) (5.8 - x / 100),
 		};
 	}
 	result = Set_Optical_Param(optical_arr, TEST_ARRAY_LEN);
@@ -174,7 +218,7 @@ int main(void) {
 		.Max_Intensity = 3.14159f,
 		.FitLimt = 4.5f,
 		.lightLeakage = 6.5f,
-		.earlyLeakage = 7.5f,
+		.earlyLeakage = 5.5f,
 		.Model = true,
 	};
 	result = Set_Analyzer_Prefit_Param(&prefit);

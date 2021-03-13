@@ -548,6 +548,101 @@ int Receive_BFI_Data(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
+int Receive_BFI_Corr_Ready(char* pDataBuf) {
+	Get_BFI_Corr_Ready_CB(true);
+	return NO_DCS_ERROR;
+}
+
+int Receive_Corr_Intensity_Data(char* pDataBuf) {
+	//Keeps track of current index while reading pDataBuf.
+	//Incremented each time data is read.
+	size_t offset = 0;
+
+	//Number of channels to expect in following data.
+	__int32 numChannels;
+	memcpy(&numChannels, &pDataBuf[offset], sizeof(numChannels));
+	numChannels = itohl(numChannels);
+	offset += sizeof(numChannels);
+
+	//Allocating memory for numChannels channels of data.
+	Corr_Intensity_Data_Type* pCorr_Intensity_Data = malloc(sizeof(*pCorr_Intensity_Data) * numChannels);
+	if (pCorr_Intensity_Data == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	//Read correlation data for each channel.
+	for (int x = 0; x < numChannels; x++) {
+		//Read the Cha_ID.
+		memcpy(&pCorr_Intensity_Data[x].Cha_ID, &pDataBuf[offset], sizeof(pCorr_Intensity_Data[x].Cha_ID));
+		pCorr_Intensity_Data[x].Cha_ID = itohl(pCorr_Intensity_Data[x].Cha_ID);
+		offset += sizeof(pCorr_Intensity_Data[x].Cha_ID);
+
+		//Read the intensity.
+		memcpy(&pCorr_Intensity_Data[x].intensity, &pDataBuf[offset], sizeof(pCorr_Intensity_Data[x].intensity));
+		pCorr_Intensity_Data[x].intensity = itohf(pCorr_Intensity_Data[x].intensity);
+		offset += sizeof(pCorr_Intensity_Data[x].intensity);
+
+		//Read data_num.
+		memcpy(&pCorr_Intensity_Data[x].Data_Num, &pDataBuf[offset], sizeof(pCorr_Intensity_Data[x].Data_Num));
+		pCorr_Intensity_Data[x].Data_Num = itohl(pCorr_Intensity_Data[x].Data_Num);
+		offset += sizeof(pCorr_Intensity_Data[x].Data_Num);
+
+		//Allocate memory for the correlation array based on data_num.
+		pCorr_Intensity_Data[x].pCorrBuf = malloc(pCorr_Intensity_Data[x].Data_Num * sizeof(*pCorr_Intensity_Data[x].pCorrBuf));
+		if (pCorr_Intensity_Data[x].pCorrBuf == NULL) {
+			//If allocation fails, loop backwards to free loop-allocated memory.
+			for (x-- ;x >= 0; x--) {
+				free(pCorr_Intensity_Data[x].pCorrBuf);
+			}
+			free(pCorr_Intensity_Data);
+			return MEMORY_ALLOCATION_ERROR;
+		}
+
+		//Read data into array.
+		for (int y = 0; y < pCorr_Intensity_Data[x].Data_Num; y++) {
+			memcpy(&pCorr_Intensity_Data[x].pCorrBuf[y], &pDataBuf[offset], sizeof(*pCorr_Intensity_Data[x].pCorrBuf));
+			pCorr_Intensity_Data[x].pCorrBuf[y] = itohf(pCorr_Intensity_Data[x].pCorrBuf[y]);
+			offset += sizeof(*pCorr_Intensity_Data[x].pCorrBuf);
+		}
+	}
+
+	//Read in delay values.
+	//Get number of values.
+	__int32 Delay_Num;
+	memcpy(&Delay_Num, &pDataBuf[offset], sizeof(Delay_Num));
+	Delay_Num = itohl(Delay_Num);
+	offset += sizeof(Delay_Num);
+
+	//Allocate memory for actual values.
+	float* pDelayBuf = malloc(Delay_Num * sizeof(*pDelayBuf));
+	if (pDelayBuf == NULL) {
+		//Free dynamically allocated resources.
+		for (size_t x = 0; x < numChannels; x++) {
+			free(pCorr_Intensity_Data[x].pCorrBuf);
+		}
+		free(pCorr_Intensity_Data);
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	//Read in actual values.
+	for (int x = 0; x < Delay_Num; x++) {
+		memcpy(&pDelayBuf[x], &pDataBuf[offset], sizeof(*pDelayBuf));
+		pDelayBuf[x] = itohf(pDelayBuf[x]);
+		offset += sizeof(*pDelayBuf);
+	}
+
+	Get_Corr_Intensity_Data_CB(pCorr_Intensity_Data, numChannels, pDelayBuf, Delay_Num);
+
+	//Free dynamically allocated resources.
+	for (size_t x = 0; x < numChannels; x++) {
+		free(pCorr_Intensity_Data[x].pCorrBuf);
+	}
+	free(pCorr_Intensity_Data);
+	free(pDelayBuf);
+
+	return NO_DCS_ERROR;
+}
+
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize) {
 	Transmission_Data_Type* pTransmission = malloc(sizeof(Transmission_Data_Type));
 	if (pTransmission == NULL) {

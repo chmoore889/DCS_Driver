@@ -69,6 +69,13 @@ typedef struct {
 	float rMSE; // relative mean square error
 } BFI_Data_Type;
 
+typedef struct {
+	int Cha_ID; //Channel ID
+	float intensity; //intensity of the optical channel
+	int Data_Num; //number of the correlation value
+	float* pCorrBuf; //pointer to the buffer of the correlation values
+} Corr_Intensity_Data_Type;
+
 //Structure for DCS address data.
 typedef struct DCS_Address {
 	const char* address; //Address of the DCS
@@ -100,6 +107,10 @@ typedef void(*Get_Error_Message_CB_Def)(char* pMessage, unsigned __int32 Size);
 //Callback for getting BFI data.
 typedef void(*Get_BFI_Data_Def)(BFI_Data_Type* pBFI_Data, int Cha_Num);
 
+typedef void(*Get_BFI_Corr_Ready_CB_Def)(bool bReady);
+
+typedef void(*Get_Corr_Intensity_Data_CB_Def)(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);
+
 typedef struct {
 	//Callback for Get_DCS_Status.
 	Get_DCS_Status_CB_Def Get_DCS_Status_CB;
@@ -115,6 +126,10 @@ typedef struct {
 	Get_Error_Message_CB_Def Get_Error_Message_CB;
 	//Callback for getting BFI data.
 	Get_BFI_Data_Def Get_BFI_Data;
+
+	Get_BFI_Corr_Ready_CB_Def Get_BFI_Corr_Ready_CB;
+
+	Get_Corr_Intensity_Data_CB_Def Get_Corr_Intensity_Data_CB;
 } Receive_Callbacks;
 
 

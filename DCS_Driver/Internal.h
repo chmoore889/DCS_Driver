@@ -59,6 +59,9 @@ host and the remote DCS. GET IDs are for the data from the DCS*/
 #define SET_ANALYZER_PREFIT_PARAM 9
 #define GET_ANALYZER_PREFIT_PARAM 10
 #define SET_OPTICAL_PARAM 11
+#define GET_BFI_DATA 13
+#define GET_CORR_INTENSITY 14
+#define GET_BFI_CORR_READY 15
 #define GET_ERROR_MESSAGE 254
 #define CHECK_NET_CONNECTION 254
 #define STOP_DCS 255
@@ -137,6 +140,8 @@ int Receive_Analyzer_Prefit_Param(char* pDataBuf);
 int Receive_Error_Message(char* pDataBuf);
 int Receive_Command_ACK(char* pDataBuf);
 int Receive_BFI_Data(char* pDataBuf);
+int Receive_BFI_Corr_Ready(char* pDataBuf);
+int Receive_Corr_Intensity_Data(char* pDataBuf);
 
 //This function generates the frame to be sent to the remote DCS.
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize);

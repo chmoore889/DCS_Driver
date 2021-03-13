@@ -14,6 +14,7 @@ int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission);
 
 int Check_Command_Response(int Option, int Command_Code);
 
+
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num);
 
 void Get_Correlator_Setting_CB(Correlator_Setting_Type* pCorrelator_Setting);
@@ -27,3 +28,7 @@ void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr);
 void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num);
 
 void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size);
+
+void Get_BFI_Corr_Ready_CB(bool bReady);
+
+void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);

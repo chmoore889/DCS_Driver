@@ -73,6 +73,7 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 		return result;
 	}
 
+	callbacks = local_callbacks;
 	result = init_Callback_mutex();
 	if (result != NO_DCS_ERROR) {
 		CloseHandle(hRunMutex);
@@ -482,8 +483,20 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 		err = Receive_Error_Message(pDataBuff);
 		break;
 
+	case GET_BFI_DATA:
+		err = Receive_BFI_Data(pDataBuff);
+		break;
+
+	case GET_BFI_CORR_READY:
+		err = Receive_BFI_Corr_Ready(pDataBuff);
+		break;
+
+	case GET_CORR_INTENSITY:
+		err = Receive_Corr_Intensity_Data(pDataBuff);
+		break;
+
 	default:
-		printf(ANSI_COLOR_RED"Invalid Data ID\n"ANSI_COLOR_RESET);
+		printf(ANSI_COLOR_RED"Invalid Data ID: %d\n"ANSI_COLOR_RESET, data_id);
 		err = FRAME_INVALID_DATA;
 	}
 
@@ -535,29 +548,73 @@ static Receive_Callbacks get_Callbacks() {
 }
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
-	get_Callbacks().Get_DCS_Status_CB(bCorr, bAnalyzer, DCS_Cha_Num);
+	Receive_Callbacks callbacks = get_Callbacks();
+
+	if (callbacks.Get_DCS_Status_CB != NULL) {
+		callbacks.Get_DCS_Status_CB(bCorr, bAnalyzer, DCS_Cha_Num);
+	}
 }
 
 void Get_Correlator_Setting_CB(Correlator_Setting_Type* pCorrelator_Setting) {
-	get_Callbacks().Get_Correlator_Setting_CB(pCorrelator_Setting);
+	Receive_Callbacks callbacks = get_Callbacks();
+
+	if (callbacks.Get_Correlator_Setting_CB != NULL) {
+		callbacks.Get_Correlator_Setting_CB(pCorrelator_Setting);
+	}
 }
 
 void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num) {
-	get_Callbacks().Get_Analyzer_Setting_CB(pAnalyzer_Setting, Cha_Num);
+	Receive_Callbacks callbacks = get_Callbacks();
+
+	if (callbacks.Get_Analyzer_Setting_CB != NULL) {
+		callbacks.Get_Analyzer_Setting_CB(pAnalyzer_Setting, Cha_Num);
+	}
 }
 
 void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit) {
-	get_Callbacks().Get_Analyzer_Prefit_Param_CB(pAnalyzer_Prefit);
+	Receive_Callbacks callbacks = get_Callbacks();
+
+	if (callbacks.Get_Analyzer_Prefit_Param_CB != NULL) {
+		callbacks.Get_Analyzer_Prefit_Param_CB(pAnalyzer_Prefit);
+	}
 }
 
 void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
-	get_Callbacks().Get_Simulated_Correlation_CB(Simulated_Corr);
+	Receive_Callbacks callbacks = get_Callbacks();
+
+	if (callbacks.Get_Simulated_Correlation_CB != NULL) {
+		callbacks.Get_Simulated_Correlation_CB(Simulated_Corr);
+	}
 }
 
 void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num) {
-	get_Callbacks().Get_BFI_Data(pBFI_Data, Cha_Num);
+	Receive_Callbacks callbacks = get_Callbacks();
+
+	if (callbacks.Get_BFI_Data != NULL) {
+		callbacks.Get_BFI_Data(pBFI_Data, Cha_Num);
+	}
 }
 
 void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
-	get_Callbacks().Get_Error_Message_CB(pMessage, Size);
+	Receive_Callbacks callbacks = get_Callbacks();
+
+	if (callbacks.Get_Error_Message_CB != NULL) {
+		callbacks.Get_Error_Message_CB(pMessage, Size);
+	}
+}
+
+void Get_BFI_Corr_Ready_CB(bool bReady) {
+	Receive_Callbacks callbacks = get_Callbacks();
+
+	if (callbacks.Get_BFI_Corr_Ready_CB != NULL) {
+		callbacks.Get_BFI_Corr_Ready_CB(bReady);
+	}
+}
+
+void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num) {
+	Receive_Callbacks callbacks = get_Callbacks();
+
+	if (callbacks.Get_Corr_Intensity_Data_CB != NULL) {
+		callbacks.Get_Corr_Intensity_Data_CB(pCorr_Intensity_Data, Cha_Num, pDelayBuf, Delay_Num);
+	}
 }
