@@ -263,6 +263,8 @@ static void COM_Task(void* address) {
 		return;
 	}
 
+	Check_Command_Response(COMMAND_RSP_RESET, NULL);
+
 	//Make the socket non-blocking for convenience when receiving data in the COM thread.
 	u_long iMode = 1;
 	iResult = ioctlsocket(ConnectSocket, FIONBIO, &iMode);
@@ -286,6 +288,8 @@ static void COM_Task(void* address) {
 			_endthread();
 			return;
 		}
+
+		Check_Command_Response(COMMAND_RSP_CHECK, NULL);
 	}
 
 	//Cleanup
@@ -296,9 +300,9 @@ static void COM_Task(void* address) {
 	_endthread();
 }
 
-int Command_Rsp_Count;
-int Command_Sent;
-bool Command_Ack;
+//TODO add mutexes to command reponse variables
+static int Command_Rsp_Count = MAX_COMMAND_RESPONSE_TIME;
+static int Command_Sent;
 
 int Check_Command_Response(int Option, int Command_Code) {
 	if (Option == COMMAND_RSP_RESET) {
@@ -307,6 +311,31 @@ int Check_Command_Response(int Option, int Command_Code) {
 		return 0;
 	}
 
+	if (Option == COMMAND_RSP_SET) {
+		Command_Ack = false;
+		Command_Sent = Command_Code;
+	}
+	
+	if (Option == COMMAND_RSP_CHECK) {
+		if (Command_Ack) {
+			return 0;
+		}
+		if (Command_Rsp_Count > 0) {
+			Command_Rsp_Count--;
+			return 1;
+		}
+		return 2;
+	}
+
+	if (Option == COMMAND_RSP_VALIDATE) {
+		if (Command_Code == Command_Sent) {
+			Command_Ack = true;
+			return 0;
+		}
+		return 1;
+	}
+
+	return 2;
 }
 
 int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission) {
