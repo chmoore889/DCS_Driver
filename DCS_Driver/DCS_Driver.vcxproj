@@ -146,6 +146,7 @@
   <ItemGroup>
     <ClCompile Include="COM_Task.c" />
     <ClCompile Include="DCS_Driver.c" />
+    <ClCompile Include="Internal.c" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

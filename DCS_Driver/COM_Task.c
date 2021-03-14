@@ -5,6 +5,8 @@
 #include <process.h>
 #include <ws2tcpip.h>
 
+#pragma comment (lib, "Ws2_32.lib")
+
 #include "DCS_Driver.h"
 #include "Internal.h"
 #include "COM_Task.h"
@@ -36,7 +38,7 @@ static inline void set_FIFO_mutex(void);
 //Releases control of the hFIFOMutex.
 static inline void release_FIFO_mutex(void);
 
-//Sends data passed to function and releases it when finished.
+//Sends data passed to function and releases it when finished. Returns <0 on error.
 static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send);
 
 //Receives data from socket. Returns >0 on fatal error, <0 on non-fatal error.
@@ -45,25 +47,37 @@ static int recv_data(SOCKET ConnectSocket);
 //Processes the raw data from the DCS. Takes a pointer to a DCS frame *excluding* the prepended frame size.
 static int process_recv(char* buff, unsigned __int32 buffLen);
 
+//Callbacks to call when the host receives data from the DCS.
 static Receive_Callbacks callbacks;
-//Handle of the mutex for adding to the callbacks struct.
+//Handle of the mutex for controlling addition to the [callbacks] struct.
 static HANDLE hCallbacksMutex;
 
-//Initializes the handle for hFIFOMutex.
+//Initializes the handle for hCallbacksMutex.
 static int init_Callback_mutex(void);
-//Releases the handle for hFIFOMutex.
+//Releases the handle for hCallbacksMutex.
 static int close_Callback_mutex(void);
+//Thread-safe method of setting the callbacks variable.
+static void set_Callbacks(Receive_Callbacks local_callbacks);
+//Thread-safe method of retrieving the callbacks variable.
+static Receive_Callbacks get_Callbacks();
 
 __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks) {
-	//Set the callback functions for receiving data.
-	callbacks = local_callbacks;
+	//Set the callback functions for receiving data whether the COM task exists or not.
+	//If the callbacks mutex isn't NULL, the COM task is already running so use the thread-safe callback setter.
+	if (hCallbacksMutex != NULL) {
+		set_Callbacks(local_callbacks);
+	}
+	//Otherwise, the thread-safe callback setter cannot be used and it's safe to set it directly.
+	else {
+		callbacks = local_callbacks;
+	}
 
-	//Return immediatly if a COM task already exists.
+	//Return if a COM task already exists.
 	if (threadHandle != NULL || hRunMutex != NULL) {
 		return THREAD_ALREADY_EXISTS;
 	}
 
-	//Initialize a set mutex.
+	//Initialize a set mutex for stopping the thread later.
 	hRunMutex = CreateMutexW(NULL, true, NULL);
 	if (hRunMutex == NULL) {
 		return THREAD_START_ERROR;
@@ -88,6 +102,7 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 	threadHandle = (HANDLE)_beginthread(COM_Task, 0, &address);
 	if (threadHandle == NULL || PtrToLong(threadHandle) == -1L) {
 		CloseHandle(hRunMutex);
+		hRunMutex = NULL;
 		close_FIFO_mutex();
 		close_Callback_mutex();
 		threadHandle = NULL;
@@ -100,16 +115,21 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 __declspec(dllexport) int Destroy_COM_Task() {
 	//If the COM task isn't already stopped, free all the task's resources.
 	if (hRunMutex != NULL) {
+		//Release the run mutex to stop the thread.
 		ReleaseMutex(hRunMutex);
 
+		//Wait for thread to close.
 		WaitForSingleObject(threadHandle, INFINITE);
 
+		//Take back control of the run mutex so it can be closed.
 		WaitForSingleObject(hRunMutex, INFINITE);
 		CloseHandle(hRunMutex);
 
+		//Close other mutexes.
 		close_FIFO_mutex();
 		close_Callback_mutex();
 
+		//Deference threads to indicate they don't exist.
 		threadHandle = NULL;
 		hRunMutex = NULL;
 	}
@@ -121,6 +141,7 @@ static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send)
 	char* tmp = realloc(data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size));
 	if (tmp == NULL) {
 		free(data_to_send->pFrame);
+		free(data_to_send);
 		return 1;
 	}
 
@@ -178,12 +199,14 @@ static int recv_data(SOCKET ConnectSocket) {
 			memcpy(&frame_data[frame_data_size - iResult], socket_buffer, iResult);
 		}
 		else if (iResult == 0) {
+			//Should never occur due to non-blocking socket.
 			printf("Connection closed\n");
 		}
 		else if (iResult < 0) {
 			//Socket should be set to non-blocking. This handles the would block error as success. Fails normally otherwise.
 			int err = WSAGetLastError();
 			if (err == WSAEWOULDBLOCK) {
+				//No error here. No data available so break from loop.
 				break;
 			}
 			else {
@@ -202,6 +225,7 @@ static int recv_data(SOCKET ConnectSocket) {
 		unsigned __int32 frameLen;
 		memcpy(&frameLen, &frame_data[totLen], sizeof(frameLen));
 
+		//Find pointer of received data and process it in process_recv.
 		char* buff = &frame_data[sizeof(frameLen) + totLen];
 		int tmpiResult = process_recv(buff, frameLen);
 		if (tmpiResult != NO_DCS_ERROR) {
@@ -241,7 +265,7 @@ static void COM_Task(void* address) {
 	hints.ai_socktype = SOCK_STREAM;
 	hints.ai_protocol = IPPROTO_TCP;
 
-	//Resolve the server address and port
+	//Resolve the server address and port.
 	iResult = getaddrinfo(dcs_address->address, dcs_address->port, &hints, &result);
 	if (iResult != 0) {
 		printf("getaddrinfo failed with error: %d\n", iResult);
@@ -250,9 +274,8 @@ static void COM_Task(void* address) {
 		return;
 	}
 
-	//Attempt to connect to an address until one succeeds
+	//Attempt to connect to an address until one succeeds.
 	for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
-
 		//Create a SOCKET for connecting to server
 		ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
 		if (ConnectSocket == INVALID_SOCKET) {
@@ -294,15 +317,24 @@ static void COM_Task(void* address) {
 
 	//Repeat while RunMutex is still taken by the main thread. Clean up and exit when it's released.
 	while (WaitForSingleObject(hRunMutex, 50) == WAIT_TIMEOUT) {
+		//If data is waiting in the queue, send it, one at a time.
 		Transmission_Data_Type* data_to_send = Dequeue_Trans_FIFO();
 		if (data_to_send != NULL) {
 			iResult = send_data(ConnectSocket, data_to_send);
+			if (iResult < 0) {
+				printf(ANSI_COLOR_RED"Sending Error\n"ANSI_COLOR_RESET);
+				_endthread();
+				return;
+			}
 		}
 
+		//Received and process data from the DCS.
 		iResult = recv_data(ConnectSocket);
 
 		if (iResult > 0) {
 			printf(ANSI_COLOR_RED"Fatal Receive Error\n"ANSI_COLOR_RESET);
+
+			closesocket(ConnectSocket);
 			WSACleanup();
 
 			_endthread();
@@ -322,6 +354,8 @@ int Command_Rsp_Count;
 int Command_Sent;
 bool Command_Ack;
 
+
+//TODO: finish this
 int Check_Command_Response(int Option, int Command_Code) {
 	if (Option == COMMAND_RSP_RESET) {
 		Command_Rsp_Count = MAX_COMMAND_RESPONSE_TIME;
@@ -421,19 +455,24 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 		return FRAME_CHECKSUM_ERROR;
 	}
 
+	size_t index = 0; //Index to track position in buff.
+
 	//Ensure header is correct
-	unsigned __int16 header;
-	memcpy(&header, &buff[0], HEADER_SIZE);
+	Frame_Version header;
+	memcpy(&header, &buff[index], sizeof(header));
+	index += sizeof(header);
+
 	header = itohs(header);
 	if (header != FRAME_VERSION) {
 		printf("Invalid header\n");
 		return FRAME_VERSION_ERROR;
 	}
 
-
 	//Ensure type id is correct.
-	unsigned __int32 type_id;
-	memcpy(&type_id, &buff[2], TYPE_ID_SIZE);
+	Type_ID type_id;
+	memcpy(&type_id, &buff[index], sizeof(type_id));
+	index += sizeof(type_id);
+
 	type_id = itohl(type_id);
 	if (type_id != DATA_ID) {
 		printf("Invalid Type ID\n");
@@ -442,19 +481,22 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 
 	//Get data id to later call correct callbacks based on data id.
 	Data_ID data_id;
-	memcpy(&data_id, &buff[6], DATA_ID_SIZE);
+	memcpy(&data_id, &buff[index], sizeof(data_id));
+	index += sizeof(data_id);
+
 	data_id = itohl(data_id);
 
 	//Obtain just the data portion of the frame and place in pDataBuff.
-	unsigned int pDataBuffLen = buffLen - DATA_ID_SIZE - TYPE_ID_SIZE - HEADER_SIZE - CHECKSUM_SIZE;
+	unsigned int pDataBuffLen = buffLen - sizeof(data_id) - sizeof(type_id) - sizeof(header) - sizeof(Checksum);
 	char* pDataBuff = malloc(pDataBuffLen);
 	if (pDataBuff == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	memcpy(pDataBuff, &buff[10], pDataBuffLen);
+	memcpy(pDataBuff, &buff[index], pDataBuffLen);
+	index += pDataBuffLen;
 
-	//Call correct callbacks based on data id with pDataBuff.
+	//Call the correct callbacks based on data id with pDataBuff.
 	int err = NO_DCS_ERROR;
 	switch (data_id) {
 	case GET_DCS_STATUS:
@@ -507,9 +549,9 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 	return err;
 }
 
-///////////
-//Callbacks
-///////////
+////////////////
+//Callbacks/////
+////////////////
 
 static int init_Callback_mutex() {
 	if (hCallbacksMutex != NULL) {
@@ -549,74 +591,77 @@ static Receive_Callbacks get_Callbacks() {
 	return local_callbacks;
 }
 
-void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
-	Receive_Callbacks callbacks = get_Callbacks();
+//Each of the following functions are internallly called callbacks. They will call the
+//user-defined callback it was passed in Initialize_COM_Task.
 
-	if (callbacks.Get_DCS_Status_CB != NULL) {
-		callbacks.Get_DCS_Status_CB(bCorr, bAnalyzer, DCS_Cha_Num);
+void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
+	Receive_Callbacks local_callbacks = get_Callbacks();
+
+	if (local_callbacks.Get_DCS_Status_CB != NULL) {
+		local_callbacks.Get_DCS_Status_CB(bCorr, bAnalyzer, DCS_Cha_Num);
 	}
 }
 
 void Get_Correlator_Setting_CB(Correlator_Setting_Type* pCorrelator_Setting) {
-	Receive_Callbacks callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = get_Callbacks();
 
-	if (callbacks.Get_Correlator_Setting_CB != NULL) {
-		callbacks.Get_Correlator_Setting_CB(pCorrelator_Setting);
+	if (local_callbacks.Get_Correlator_Setting_CB != NULL) {
+		local_callbacks.Get_Correlator_Setting_CB(pCorrelator_Setting);
 	}
 }
 
 void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num) {
-	Receive_Callbacks callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = get_Callbacks();
 
-	if (callbacks.Get_Analyzer_Setting_CB != NULL) {
-		callbacks.Get_Analyzer_Setting_CB(pAnalyzer_Setting, Cha_Num);
+	if (local_callbacks.Get_Analyzer_Setting_CB != NULL) {
+		local_callbacks.Get_Analyzer_Setting_CB(pAnalyzer_Setting, Cha_Num);
 	}
 }
 
 void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit) {
-	Receive_Callbacks callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = get_Callbacks();
 
-	if (callbacks.Get_Analyzer_Prefit_Param_CB != NULL) {
-		callbacks.Get_Analyzer_Prefit_Param_CB(pAnalyzer_Prefit);
+	if (local_callbacks.Get_Analyzer_Prefit_Param_CB != NULL) {
+		local_callbacks.Get_Analyzer_Prefit_Param_CB(pAnalyzer_Prefit);
 	}
 }
 
 void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
-	Receive_Callbacks callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = get_Callbacks();
 
-	if (callbacks.Get_Simulated_Correlation_CB != NULL) {
-		callbacks.Get_Simulated_Correlation_CB(Simulated_Corr);
+	if (local_callbacks.Get_Simulated_Correlation_CB != NULL) {
+		local_callbacks.Get_Simulated_Correlation_CB(Simulated_Corr);
 	}
 }
 
 void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num) {
-	Receive_Callbacks callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = get_Callbacks();
 
-	if (callbacks.Get_BFI_Data != NULL) {
-		callbacks.Get_BFI_Data(pBFI_Data, Cha_Num);
+	if (local_callbacks.Get_BFI_Data != NULL) {
+		local_callbacks.Get_BFI_Data(pBFI_Data, Cha_Num);
 	}
 }
 
 void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
-	Receive_Callbacks callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = get_Callbacks();
 
-	if (callbacks.Get_Error_Message_CB != NULL) {
-		callbacks.Get_Error_Message_CB(pMessage, Size);
+	if (local_callbacks.Get_Error_Message_CB != NULL) {
+		local_callbacks.Get_Error_Message_CB(pMessage, Size);
 	}
 }
 
 void Get_BFI_Corr_Ready_CB(bool bReady) {
-	Receive_Callbacks callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = get_Callbacks();
 
-	if (callbacks.Get_BFI_Corr_Ready_CB != NULL) {
-		callbacks.Get_BFI_Corr_Ready_CB(bReady);
+	if (local_callbacks.Get_BFI_Corr_Ready_CB != NULL) {
+		local_callbacks.Get_BFI_Corr_Ready_CB(bReady);
 	}
 }
 
 void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num) {
-	Receive_Callbacks callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = get_Callbacks();
 
-	if (callbacks.Get_Corr_Intensity_Data_CB != NULL) {
-		callbacks.Get_Corr_Intensity_Data_CB(pCorr_Intensity_Data, Cha_Num, pDelayBuf, Delay_Num);
+	if (local_callbacks.Get_Corr_Intensity_Data_CB != NULL) {
+		local_callbacks.Get_Corr_Intensity_Data_CB(pCorr_Intensity_Data, Cha_Num, pDelayBuf, Delay_Num);
 	}
 }

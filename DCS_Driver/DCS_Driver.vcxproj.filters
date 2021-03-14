@@ -32,5 +32,8 @@
     <ClCompile Include="COM_Task.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Internal.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
 </Project>

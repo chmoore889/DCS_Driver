@@ -12,7 +12,7 @@
 #define HOST_NAME "129.49.117.79"
 
 #define TEST_ARRAY_LEN 6
-#define FUNC_TO_TEST 12
+#define FUNC_TO_TEST 0
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("DCS Status:\n");
@@ -176,29 +176,20 @@ int main(void) {
 #endif // 4
 
 #if FUNC_TO_TEST == 5
-	int ids[] = { 1, 5, 7, 9 };
-	result = Start_DCS_Measurement(5, ids, sizeof(ids) / sizeof(ids[0]));
-#endif // 5
 	result = Enable_DCS(true, true);
 
 	int ids[] = { 1, 2,};
 	result = Start_DCS_Measurement(5, ids, sizeof(ids) / sizeof(ids[0]));
 	Sleep(5000);
 	result = Stop_DCS_Measurement();
+#endif // 5
+
 
 #if FUNC_TO_TEST == 6
-	result = Stop_DCS_Measurement();
-#endif // 6
-
-#if FUNC_TO_TEST == 7
-	result = Enable_DCS(true, false);
-#endif // 7
-
-#if FUNC_TO_TEST == 8
 	result = Get_Simulated_Correlation();
 #endif // 8
 
-#if FUNC_TO_TEST == 9
+#if FUNC_TO_TEST == 7
 	Optical_Param_Type optical_arr[TEST_ARRAY_LEN];
 	for (int x = 0; x < TEST_ARRAY_LEN; x++) {
 		optical_arr[x] = (Optical_Param_Type){
@@ -210,7 +201,7 @@ int main(void) {
 	result = Set_Optical_Param(optical_arr, TEST_ARRAY_LEN);
 #endif // 9
 
-#if FUNC_TO_TEST == 10
+#if FUNC_TO_TEST == 8
 	Analyzer_Prefit_Param_Type prefit = (Analyzer_Prefit_Param_Type){
 		.Precut = 5,
 		.PostCut = 10,
@@ -224,7 +215,7 @@ int main(void) {
 	result = Set_Analyzer_Prefit_Param(&prefit);
 #endif // 10
 
-#if FUNC_TO_TEST == 11
+#if FUNC_TO_TEST == 9
 	result = Get_Analyzer_Prefit_Param();
 #endif // 11
 

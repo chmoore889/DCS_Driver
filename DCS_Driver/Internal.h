@@ -1,5 +1,6 @@
 #pragma once
 #include <WinSock2.h>
+#include "DCS_Driver.h"
 
 enum Endianess
 {
@@ -25,6 +26,8 @@ enum Endianess
 ( (((data) >> 24) & 0x000000FF) | (((data) >>  8) & 0x0000FF00) | \
   (((data) <<  8) & 0x00FF0000) | (((data) << 24) & 0xFF000000) ) 
 
+//Host to output functions//
+
 //Converts host long to ENDIANESS_OUTPUT endianess.
 u_long htool(u_long hlong);
 
@@ -33,6 +36,8 @@ u_short htoos(u_short hshort);
 
 //Converts host float to ENDIANESS_OUTPUT endianess.
 float htoof(float value);
+
+//Input to host functions//
 
 //Converts ENDIANESS_INPUT endianess long to host endianess.
 u_long itohl(u_long ilong);
@@ -45,8 +50,9 @@ float itohf(float value);
 
 
 //Data IDs
-/*The following are data IDs used in the communication between the
-host and the remote DCS. GET IDs are for the data from the DCS*/
+//The following are data IDs used in the communication between the
+//host and the remote DCS. GET IDs are for asking for data from the DCS and receiving it.
+//SET IDs are for setting DCS parameters.
 #define GET_DCS_STATUS 0
 #define SET_CORRELATOR_SETTING 1
 #define GET_CORRELATOR_SETTING 2
@@ -67,7 +73,7 @@ host and the remote DCS. GET IDs are for the data from the DCS*/
 #define STOP_DCS 255
 #define COMMAND_ACK 255
 
-//Type Ids
+//Data Type Ids
 #define COMMAND_ID 0x00000000
 #define DATA_ID 0x00000001
 
@@ -87,13 +93,22 @@ host and the remote DCS. GET IDs are for the data from the DCS*/
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
+//Frame version of DCS frame is a 16 bit integer.
+typedef unsigned __int16 Frame_Version;
 
+//Type id of DCS frame is a 32 bit integer.
+typedef unsigned __int32 Type_ID;
+
+//Data id of DCS frame is a 32 bit integer.
 typedef unsigned __int32 Data_ID;
+
+//Checksum of DCS frame is an 8 bit integer.
+typedef unsigned __int8 Checksum;
 
 typedef struct Transmission_Data_Type {
 	unsigned int size; //Size of the transmission buffer
 	char* pFrame; //Pointer to the transmission buffer
-	struct Transmission_Data_Type* pNextItem; //Pointer for the FIFO
+	struct Transmission_Data_Type* pNextItem; //Pointer to the next item in the queue.
 } Transmission_Data_Type;
 
 //This function is called by the function Get_DCS_Status. It calls the function
@@ -102,6 +117,7 @@ typedef struct Transmission_Data_Type {
 int Send_Get_DSC_Status(void);
 int Receive_DCS_Status(char* pDataBuf);
 
+//Sends command to set the passed correlator settings.
 int Send_Correlator_Setting(Correlator_Setting_Type* pCorrelator_Setting);
 
 //This function is called by the function Get_Correlator_Setting. It calls the function
@@ -110,6 +126,7 @@ int Send_Correlator_Setting(Correlator_Setting_Type* pCorrelator_Setting);
 int Send_Get_Correlator_Setting(void);
 int Receive_Correlator_Setting(char* pDataBuf);
 
+//Sends command to set the passed analyzer settings.
 int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
 
 //This function is called by the function Get_Analyzer_Setting. It calls the function
@@ -118,17 +135,26 @@ int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num)
 int Send_Get_Analyzer_Setting(void);
 int Receive_Analyzer_Setting(char* pDataBuf);
 
+//Sends command to start a measurement with the passed parameters.
 int Send_Start_Measurement(int Interval, int* pCha_IDs, int Cha_Num);
 
+//Sends command to start a measurement with the passed parameters.
 int Send_Stop_Measurement(void);
 
+//Sends command to enable or disable different outputs of the DCS.
 int Send_Enable_DCS(bool bCorr, bool bAnalyzer);
 
+
+//This function is called by the function Get_Simulated_Correlation. It calls the function
+//Send_DCS_Command to send the “Get Simulated Correlation” command to the DCS. The data will
+//be received by the function Receive_Simulated_Correlation.
 int Send_Get_Simulated_Correlation(void);
 int Receive_Simulated_Correlation(char* pDataBuf);
 
+//Sends command to set the passed optical paramters with the given array of [Cha_Num] length.
 int Send_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num);
 
+//Sends command to set the passed prefit paramters.
 int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param);
 
 //This function is called by the function Get_Analyzer_Prefit_Param. It calls the function
@@ -137,19 +163,30 @@ int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Para
 int Send_Get_Analyzer_Prefit_Param(void);
 int Receive_Analyzer_Prefit_Param(char* pDataBuf);
 
+//Receives logging messages from the DCS device and calls user-defined callback.
 int Receive_Error_Message(char* pDataBuf);
+
+//Handles the acknowledgement frame from the DCS.
 int Receive_Command_ACK(char* pDataBuf);
+
+//Processes BFI data and calls user-defined callback with the data.
 int Receive_BFI_Data(char* pDataBuf);
+
+//Processes command that alerts client program that the BFI data is ready.
 int Receive_BFI_Corr_Ready(char* pDataBuf);
+
+//Processes correlation intensity data and calls user-defined callback with the data.
 int Receive_Corr_Intensity_Data(char* pDataBuf);
 
 //This function generates the frame to be sent to the remote DCS.
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize);
 
-//Checks given checksum from a full DCS frame
-//Returns true if checksum is valid
+//Computes a checksum from a given DCS frame.
 unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size);
-bool check_checksum(char* pDataBuf, size_t size);
 
-//Prints out data at addr in hex format in debug build.
+//Checks given checksum from a full DCS frame.
+//Returns true if checksum is valid. False otherwise.
+bool check_checksum(char* pDataBuf, unsigned int size);
+
+//Prints out data at addr in hex format only in debug build. NOP in release.
 void hexDump(const char* desc, const void* addr, const int len);

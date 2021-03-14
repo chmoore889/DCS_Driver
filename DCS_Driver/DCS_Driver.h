@@ -2,7 +2,7 @@
 
 #include <stdbool.h>
 
-//Error Codes
+//DCS Error Codes
 #define NO_DCS_ERROR 0
 #define FRAME_CHECKSUM_ERROR -1
 #define FRAME_VERSION_ERROR -2
@@ -11,7 +11,7 @@
 #define MEMORY_ALLOCATION_ERROR -5
 #define NETWORK_NOT_READY -6
 
-//Thread Error Codes
+//COM Task - Thread Error Codes
 #define THREAD_START_ERROR -7
 #define THREAD_ALREADY_EXISTS -8
 
@@ -78,9 +78,10 @@ typedef struct {
 
 //Structure for DCS address data.
 typedef struct DCS_Address {
-	const char* address; //Address of the DCS
+	const char* address; //IP Address of the DCS
 	const char* port; //Port of the DCS
 } DCS_Address;
+
 
 /////////////////////////////////
 //User-defined Callbacks Typedefs
@@ -107,10 +108,13 @@ typedef void(*Get_Error_Message_CB_Def)(char* pMessage, unsigned __int32 Size);
 //Callback for getting BFI data.
 typedef void(*Get_BFI_Data_Def)(BFI_Data_Type* pBFI_Data, int Cha_Num);
 
+//Callback for signaling that the BFI correlation data is ready.
 typedef void(*Get_BFI_Corr_Ready_CB_Def)(bool bReady);
 
+//Callback for getting the correlation intensity data.
 typedef void(*Get_Corr_Intensity_Data_CB_Def)(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);
 
+//Structure to hold all of the callbacks for the COM task to call.
 typedef struct {
 	//Callback for Get_DCS_Status.
 	Get_DCS_Status_CB_Def Get_DCS_Status_CB;
@@ -126,14 +130,15 @@ typedef struct {
 	Get_Error_Message_CB_Def Get_Error_Message_CB;
 	//Callback for getting BFI data.
 	Get_BFI_Data_Def Get_BFI_Data;
-
+	//Callback for signaling that the BFI correlation data is ready.
 	Get_BFI_Corr_Ready_CB_Def Get_BFI_Corr_Ready_CB;
-
+	//Callback for getting the correlation intensity data.
 	Get_Corr_Intensity_Data_CB_Def Get_Corr_Intensity_Data_CB;
 } Receive_Callbacks;
 
-
+////////////
 //Public API
+////////////
 
 //Starts the COM task for the DCS driver. Not necessary to call before other functions,
 //which will be queued up and sent once the task is initialized.
@@ -163,7 +168,8 @@ __declspec(dllexport) int Set_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_
 //function Get_Analyzer_Setting_CB.
 __declspec(dllexport) int Get_Analyzer_Setting(void);
 
-//Starts the DCS measurement.
+//Starts the DCS measurement. The [interval] is the time between measurements as a multiple of 10ms.
+//[pCha_IDs] is an array of channel ids and [Cha_Num] is the length of that array.
 __declspec(dllexport) int Start_DCS_Measurement(int interval, int* pCha_IDs, int Cha_Num);
 
 //Stops the DCS measurement.
