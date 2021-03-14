@@ -141,7 +141,8 @@ typedef struct {
 ////////////
 
 //Starts the COM task for the DCS driver. Not necessary to call before other functions,
-//which will be queued up and sent once the task is initialized.
+//which will be queued up and sent once the task is initialized. Takes the address of the DCS
+//and a structure of callbacks for the COM task to call when receiving data.
 __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks);
 
 //Destroys an already created COM task.
