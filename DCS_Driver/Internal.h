@@ -79,11 +79,6 @@ float itohf(float value);
 
 #define FRAME_VERSION 0xFF01
 
-#define HEADER_SIZE 2
-#define TYPE_ID_SIZE 4
-#define DATA_ID_SIZE 4
-#define CHECKSUM_SIZE 1
-
 //Standard console output colors for creating colored stdout
 #define ANSI_COLOR_RED     "\x1b[31m"
 #define ANSI_COLOR_GREEN   "\x1b[32m"
@@ -106,7 +101,7 @@ typedef unsigned __int32 Data_ID;
 typedef unsigned __int8 Checksum;
 
 typedef struct Transmission_Data_Type {
-	unsigned int size; //Size of the transmission buffer
+	unsigned __int32 size; //Size of the transmission buffer
 	char* pFrame; //Pointer to the transmission buffer
 	struct Transmission_Data_Type* pNextItem; //Pointer to the next item in the queue.
 } Transmission_Data_Type;
@@ -127,7 +122,7 @@ int Send_Get_Correlator_Setting(void);
 int Receive_Correlator_Setting(char* pDataBuf);
 
 //Sends command to set the passed analyzer settings.
-int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
+int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, unsigned __int32 Cha_Num);
 
 //This function is called by the function Get_Analyzer_Setting. It calls the function
 //Send_DCS_Command to send the “Get Analyzer Settings” command to the DCS. The data will
@@ -136,7 +131,7 @@ int Send_Get_Analyzer_Setting(void);
 int Receive_Analyzer_Setting(char* pDataBuf);
 
 //Sends command to start a measurement with the passed parameters.
-int Send_Start_Measurement(int Interval, int* pCha_IDs, int Cha_Num);
+int Send_Start_Measurement(__int32 Interval, unsigned __int32* pCha_IDs, unsigned __int32 Cha_Num);
 
 //Sends command to start a measurement with the passed parameters.
 int Send_Stop_Measurement(void);
@@ -178,15 +173,15 @@ int Receive_BFI_Corr_Ready(char* pDataBuf);
 //Processes correlation intensity data and calls user-defined callback with the data.
 int Receive_Corr_Intensity_Data(char* pDataBuf);
 
-//This function generates the frame to be sent to the remote DCS.
-int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, unsigned int BufferSize);
+//This function generates the frame to be sent to the remote DCS. 
+int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize);
 
 //Computes a checksum from a given DCS frame.
-unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size);
+unsigned __int8 compute_checksum(char* pDataBuf, unsigned __int32 size);
 
 //Checks given checksum from a full DCS frame.
 //Returns true if checksum is valid. False otherwise.
-bool check_checksum(char* pDataBuf, unsigned int size);
+bool check_checksum(char* pDataBuf, unsigned __int32 size);
 
 //Prints out data at addr in hex format only in debug build. NOP in release.
-void hexDump(const char* desc, const void* addr, const int len);
+void hexDump(const char* desc, const void* addr, const unsigned __int32 len);

@@ -455,7 +455,7 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 		return FRAME_CHECKSUM_ERROR;
 	}
 
-	size_t index = 0; //Index to track position in buff.
+	unsigned __int32 index = 0; //Index to track position in buff.
 
 	//Ensure header is correct
 	Frame_Version header;

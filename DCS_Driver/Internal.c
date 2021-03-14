@@ -13,7 +13,7 @@ int Send_Get_DSC_Status(void) {
 }
 
 int Receive_DCS_Status(char* pDataBuf) {
-	size_t index = 0;
+	unsigned __int32 index = 0;
 
 	bool bCorr; // TRUE if correlator is started, FALSE if the correlator is not started.
 	bool bAnalyzer; // TRUE if analyzer is started, FALSE if the analyzer is not started.
@@ -39,7 +39,7 @@ int Receive_DCS_Status(char* pDataBuf) {
 
 int Send_Correlator_Setting(Correlator_Setting_Type* pCorrelator_Setting) {
 	char* pDataBuf; //data buffer for the byte stream of the correlator setting data
-	const size_t BufferSize = sizeof(*pCorrelator_Setting); //data size of the buffer pDataBuf
+	const unsigned __int32 BufferSize = sizeof(*pCorrelator_Setting); //data size of the buffer pDataBuf
 
 	//Set the Data_N to either 16384 or 32768.
 	if (pCorrelator_Setting->Data_N > 16384) {
@@ -88,7 +88,7 @@ int Receive_Correlator_Setting(char* pDataBuf) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	size_t index = 0;//Keeps track of the current pDataBuf index
+	unsigned __int32 index = 0;//Keeps track of the current pDataBuf index
 
 	//Copy each parameter from the input buffer and increment index.
 	unsigned __int32 Data_N;
@@ -126,8 +126,8 @@ int Receive_Correlator_Setting(char* pDataBuf) {
 
 int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, unsigned __int32 Cha_Num) {
 	char* pDataBuf; //Data buffer for the byte stream of the analyzer setting data.
-	size_t index = 0;//Keeps track of the current pDataBuf index
-	const size_t BufferSize = sizeof(Cha_Num) + Cha_Num * sizeof(*pAnalyzer_Setting);
+	unsigned __int32 index = 0;//Keeps track of the current pDataBuf index
+	const unsigned __int32 BufferSize = sizeof(Cha_Num) + Cha_Num * sizeof(*pAnalyzer_Setting);
 
 	pDataBuf = malloc(BufferSize);
 	if (pDataBuf == NULL) {
@@ -151,7 +151,7 @@ int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, unsigned __i
 	}
 
 	//Loop over each channel and change each parameter to network byte order.
-	for (int x = 0; x < Cha_Num; x++) {
+	for (unsigned __int32 x = 0; x < Cha_Num; x++) {
 		network_Analyzer[x].Alpha = htoof(pAnalyzer_Setting[x].Alpha);
 		network_Analyzer[x].Beta = htoof(pAnalyzer_Setting[x].Beta);
 		network_Analyzer[x].Db = htoof(pAnalyzer_Setting[x].Db);
@@ -179,7 +179,7 @@ int Send_Get_Analyzer_Setting(void) {
 }
 
 int Receive_Analyzer_Setting(char* pDataBuf) {
-	size_t index = 0;//Keeps track of the current pDataBuf index.
+	unsigned __int32 index = 0;//Keeps track of the current pDataBuf index.
 
 	Analyzer_Setting_Type* pAnalyzer_Setting;
 	unsigned __int32 Cha_Num;
@@ -197,7 +197,7 @@ int Receive_Analyzer_Setting(char* pDataBuf) {
 	}
 
 #pragma warning (disable: 6386 6385)
-	for (int x = 0; x < Cha_Num; x++) {
+	for (unsigned __int32 x = 0; x < Cha_Num; x++) {
 		memcpy(&pAnalyzer_Setting[x], &pDataBuf[index], sizeof(*pAnalyzer_Setting));
 		index += sizeof(*pAnalyzer_Setting);
 
@@ -218,10 +218,10 @@ int Receive_Analyzer_Setting(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
-int Send_Start_Measurement(__int32 Interval, int* pCha_IDs, unsigned __int32 Cha_Num) {
+int Send_Start_Measurement(__int32 Interval, unsigned __int32* pCha_IDs, unsigned __int32 Cha_Num) {
 	char* pDataBuf;//Output buffer.
-	size_t index = 0;//Keeps track of the current pDataBuf index.
-	const size_t BufferSize = sizeof(Interval) + sizeof(Cha_Num) + Cha_Num * sizeof(*pCha_IDs);
+	unsigned __int32 index = 0;//Keeps track of the current pDataBuf index.
+	const unsigned __int32 BufferSize = sizeof(Interval) + sizeof(Cha_Num) + Cha_Num * sizeof(*pCha_IDs);
 
 	//Allocate output buffer.
 	pDataBuf = malloc(BufferSize);
@@ -247,7 +247,7 @@ int Send_Start_Measurement(__int32 Interval, int* pCha_IDs, unsigned __int32 Cha
 
 	//Copy inputted array to [network_Cha_IDs] and change to output byte order in loop.
 	memcpy(network_Cha_IDs, pCha_IDs, Cha_Num * sizeof(*network_Cha_IDs));
-	for (int x = 0; x < Cha_Num; x++) {
+	for (unsigned __int32 x = 0; x < Cha_Num; x++) {
 		network_Cha_IDs[x] = htool(network_Cha_IDs[x]);
 	}
 
@@ -269,9 +269,9 @@ int Send_Stop_Measurement(void) {
 }
 
 int Send_Enable_DCS(bool bCorr, bool bAnalyzer) {
-	const size_t BufferSize = sizeof(bCorr) + sizeof(bAnalyzer);
+	const unsigned __int32 BufferSize = sizeof(bCorr) + sizeof(bAnalyzer);
 
-	size_t index = 0;//Keeps track of the current pDataBuf index.
+	unsigned __int32 index = 0;//Keeps track of the current pDataBuf index.
 
 	//Allocate final output buffer.
 	char* pDataBuf = malloc(BufferSize);
@@ -297,7 +297,7 @@ int Send_Get_Simulated_Correlation(void) {
 }
 
 int Receive_Simulated_Correlation(char* pDataBuf) {
-	size_t index = 0;//Keeps track of the current pDataBuf index.
+	unsigned __int32 index = 0;//Keeps track of the current pDataBuf index.
 
 	Simulated_Corr_Type Simulated_Corr = { 0 };
 
@@ -340,8 +340,8 @@ int Receive_Simulated_Correlation(char* pDataBuf) {
 
 int Send_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num) {
 	char* pDataBuf;
-	size_t index = 0;//Keeps track of the current pDataBuf index.
-	const size_t BufferSize = sizeof(Cha_Num) + Cha_Num * sizeof(*pOpt_Param);
+	unsigned __int32 index = 0;//Keeps track of the current pDataBuf index.
+	const unsigned __int32 BufferSize = sizeof(Cha_Num) + Cha_Num * sizeof(*pOpt_Param);
 
 	pDataBuf = malloc(BufferSize);
 	if (pDataBuf == NULL) {
@@ -380,7 +380,7 @@ int Send_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num) {
 
 int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param) {
 	char* pDataBuf;
-	const size_t BufferSize = sizeof(*pAnalyzer_Prefit_Param);
+	const unsigned __int32 BufferSize = sizeof(*pAnalyzer_Prefit_Param);
 
 	//Allocate memory for output buffer.
 	pDataBuf = malloc(BufferSize);
@@ -482,7 +482,7 @@ int Receive_BFI_Data(char* pDataBuf) {
 
 	for (unsigned __int32 x = 0; x < numChannels; x++) {
 		//Find index of BFI data in the raw buffer.
-		size_t rawDataOffset = sizeof(numChannels) + x * sizeof(*pBFI_Data);
+		unsigned __int32 rawDataOffset = sizeof(numChannels) + x * sizeof(*pBFI_Data);
 
 		//For each struct member, copy from the input buffer and change to host byte order.
 		BFI_Data_Type* currentBFI = &pBFI_Data[x];
@@ -517,7 +517,7 @@ int Receive_BFI_Corr_Ready(char* pDataBuf) {
 
 int Receive_Corr_Intensity_Data(char* pDataBuf) {
 	//Keeps track of current index while reading pDataBuf.
-	size_t index = 0;
+	unsigned __int32 index = 0;
 
 	//Number of channels to expect in following data.
 	unsigned __int32 numChannels;
@@ -532,7 +532,7 @@ int Receive_Corr_Intensity_Data(char* pDataBuf) {
 	}
 
 	//Read correlation data for each channel.
-	for (int x = 0; x < numChannels; x++) {
+	for (unsigned __int32 x = 0; x < numChannels; x++) {
 		//Read the Cha_ID.
 		memcpy(&pCorr_Intensity_Data[x].Cha_ID, &pDataBuf[index], sizeof(pCorr_Intensity_Data[x].Cha_ID));
 		pCorr_Intensity_Data[x].Cha_ID = itohl(pCorr_Intensity_Data[x].Cha_ID);
@@ -552,8 +552,8 @@ int Receive_Corr_Intensity_Data(char* pDataBuf) {
 		pCorr_Intensity_Data[x].pCorrBuf = malloc(pCorr_Intensity_Data[x].Data_Num * sizeof(*pCorr_Intensity_Data[x].pCorrBuf));
 		if (pCorr_Intensity_Data[x].pCorrBuf == NULL) {
 			//If allocation fails, loop backwards to free loop-allocated memory.
-			for (x--;x >= 0; x--) {
-				free(pCorr_Intensity_Data[x].pCorrBuf);
+			for (int y = x - 1; y >= 0; y--) {
+				free(pCorr_Intensity_Data[y].pCorrBuf);
 			}
 			free(pCorr_Intensity_Data);
 			return MEMORY_ALLOCATION_ERROR;
@@ -578,7 +578,7 @@ int Receive_Corr_Intensity_Data(char* pDataBuf) {
 	float* pDelayBuf = malloc(Delay_Num * sizeof(*pDelayBuf));
 	if (pDelayBuf == NULL) {
 		//Free dynamically allocated resources.
-		for (size_t x = 0; x < numChannels; x++) {
+		for (unsigned __int32 x = 0; x < numChannels; x++) {
 			free(pCorr_Intensity_Data[x].pCorrBuf);
 		}
 		free(pCorr_Intensity_Data);
@@ -586,7 +586,7 @@ int Receive_Corr_Intensity_Data(char* pDataBuf) {
 	}
 
 	//Read in actual values.
-	for (int x = 0; x < Delay_Num; x++) {
+	for (unsigned __int32 x = 0; x < Delay_Num; x++) {
 		memcpy(&pDelayBuf[x], &pDataBuf[index], sizeof(*pDelayBuf));
 		pDelayBuf[x] = itohf(pDelayBuf[x]);
 		index += sizeof(*pDelayBuf);
@@ -595,7 +595,7 @@ int Receive_Corr_Intensity_Data(char* pDataBuf) {
 	Get_Corr_Intensity_Data_CB(pCorr_Intensity_Data, numChannels, pDelayBuf, Delay_Num);
 
 	//Free dynamically allocated resources.
-	for (size_t x = 0; x < numChannels; x++) {
+	for (unsigned __int32 x = 0; x < numChannels; x++) {
 		free(pCorr_Intensity_Data[x].pCorrBuf);
 	}
 	free(pCorr_Intensity_Data);
@@ -604,7 +604,7 @@ int Receive_Corr_Intensity_Data(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
-int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const size_t BufferSize) {
+int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize) {
 	//Allocate memory for [pTransmission].
 	Transmission_Data_Type* pTransmission = malloc(sizeof(*pTransmission));
 	if (pTransmission == NULL) {
@@ -614,7 +614,7 @@ int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const size_t BufferSize) {
 	//Transmission size = 2(Header) + 4(Type ID) + 4(Data ID) + BufferSize + 1 (Checksum)
 	pTransmission->size = sizeof(Frame_Version) + sizeof(Type_ID) + sizeof(Data_ID) + BufferSize + 1;
 
-	size_t index = 0; //Index to track position in pFrame.
+	unsigned __int32 index = 0; //Index to track position in pFrame.
 	pTransmission->pFrame = malloc(pTransmission->size);
 	if (pTransmission->pFrame == NULL) {
 		free(pTransmission);
@@ -648,7 +648,7 @@ int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const size_t BufferSize) {
 	return Enqueue_Trans_FIFO(pTransmission);
 }
 
-Checksum compute_checksum(char* pDataBuf, unsigned int size) {
+Checksum compute_checksum(char* pDataBuf, unsigned __int32 size) {
 	unsigned __int8 xor_sum = 0;
 	for (unsigned int index = 0; index < size; index++) {
 		xor_sum ^= pDataBuf[index];
@@ -657,9 +657,9 @@ Checksum compute_checksum(char* pDataBuf, unsigned int size) {
 	return xor_sum;
 }
 
-bool check_checksum(char* pDataBuf, unsigned int size) {
+bool check_checksum(char* pDataBuf, unsigned __int32 size) {
 	unsigned __int8 xor_sum = 0;
-	for (unsigned int index = 0; index < size; index++) {
+	for (unsigned __int32 index = 0; index < size; index++) {
 		xor_sum ^= pDataBuf[index];
 	}
 
@@ -763,9 +763,9 @@ float itohf(float value) {
 }
 
 //Convenience function for dumping data to stdout in debug builds, but nothing in release.
-void hexDump(const char* desc, const void* addr, const int len) {
+void hexDump(const char* desc, const void* addr, const unsigned __int32 len) {
 #if defined(_DEBUG)
-	int i;
+	unsigned __int32 i;
 	unsigned char buff[17];
 	const unsigned char* pc = (const unsigned char*)addr;
 
@@ -776,10 +776,6 @@ void hexDump(const char* desc, const void* addr, const int len) {
 	// Length checks.
 	if (len == 0) {
 		printf("  ZERO LENGTH\n");
-		return;
-	}
-	else if (len < 0) {
-		printf("  NEGATIVE LENGTH: %d\n", len);
 		return;
 	}
 
