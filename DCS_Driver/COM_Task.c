@@ -156,6 +156,7 @@ static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send)
 #pragma warning (default: 6386)
 
 	hexDump("Data packet", data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size));
+
 	//Send the data over the socket. data_to_send->size was not modified when prepending the frame size so it is added here.
 	int iResult = send(ConnectSocket, data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size), 0);
 	if (iResult == SOCKET_ERROR) {
