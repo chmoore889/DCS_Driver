@@ -88,8 +88,9 @@ int Receive_Correlator_Setting(char* pDataBuf) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	size_t index = 0;
+	size_t index = 0;//Keeps track of the current pDataBuf index
 
+	//Copy each parameter from the input buffer and increment index.
 	unsigned __int32 Data_N;
 	unsigned __int32 Scale;
 	unsigned __int32 Sample_Size;
