@@ -140,58 +140,119 @@ typedef struct {
 //Public API
 ////////////
 
-//Starts the COM task for the DCS driver. Not necessary to call before other functions,
+//
 //which will be queued up and sent once the task is initialized. Takes the address of the DCS
 //and a structure of callbacks for the COM task to call when receiving data.
+
+/// <summary>
+/// Starts the COM task for the DCS driver. <para>Not necessary to call before other DCS functions.
+/// Other function calls will be queued up and sent once the COM task is initialized.
+/// Can be called multiple times without calling [Destroy_COM_Task] to change the callbacks
+/// being used, but not the address.</para>
+/// </summary>
+/// <param name="address">Address structure containing the IP and port of the
+/// DCS device.
+/// </param>
+/// <param name="local_callbacks">Structure of callbacks for the COM task
+/// to call when data is received.</param>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks);
 
-//Destroys an already created COM task.
+/// <summary>
+/// Destroys an already created COM task. Should be called when no more data is to be sent or received.
+/// Also needs to be called to change the IP address of the DCS.
+/// </summary>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Destroy_COM_Task(void);
 
-//Initiates the command to retrieve the status of the DCS.
-//The settings data will be sent back by the driver through the callback 
-//function Get_DCS_Status_CB.
+/// <summary>
+/// Initiates the command to retrieve the status of the DCS. The data will be sent back by the driver
+/// through the callback function [Get_DCS_Status_CB].
+/// </summary>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Get_DCS_Status(void);
 
-//Configures the correlator settings in the DCS using the data in the array pCorr_Setting.
+/// <summary>
+/// Configures the correlator settings in the DCS.
+/// </summary>
+/// <param name="pCorr_Setting">The settings to send to the DCS.</param>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Set_Correlator_Setting(Correlator_Setting_Type* pCorr_Setting);
 
-//Initiates the command to retrieve the correlator settings in the DCS.
-//The settings data will be sent back by the driver through the callback 
-//function Get_Correlator_Setting_CB.
+/// <summary>
+/// Initiates the command to retrieve the correlator settings of the DCS. The settings data will be
+/// sent back by the driver through the callback function [Get_Correlator_Setting_CB].
+/// </summary>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Get_Correlator_Setting(void);
 
-//Configures the analyzer settings in the DCS using the data in the array pAnalyzer_Setting
+/// <summary>
+/// Configures the analyzer settings of the DCS.
+/// </summary>
+/// <param name="pAnalyzer_Setting">Array of analyzer settings to send.</param>
+/// <param name="Cha_Num">Number of DCS channels. Should equal the length of the
+/// <paramref name="pAnalyzer_Setting"/> array.</param>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Set_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
 
-//Retrieves the last fitted correlation from the DCS.
-//The correlation data will be sent back by the driver through the callback 
-//function Get_Analyzer_Setting_CB.
+/// <summary>
+/// Retrieves the last fitted correlation from the DCS. The correlation data will be sent back by the
+/// driver through the callback function [Get_Analyzer_Setting_CB].
+/// </summary>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Get_Analyzer_Setting(void);
 
-//Starts the DCS measurement. The [interval] is the time between measurements as a multiple of 10ms.
-//[pCha_IDs] is an array of channel ids and [Cha_Num] is the length of that array.
+/// <summary>
+/// Sends command to start the DCS measurement.
+/// </summary>
+/// <param name="interval">The time between measurements as a multiple of 10ms.</param>
+/// <param name="pCha_IDs">Array of channel ids.</param>
+/// <param name="Cha_Num">Length of the <paramref name="pCha_IDs"/> array.</param>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Start_DCS_Measurement(int interval, int* pCha_IDs, int Cha_Num);
 
-//Stops the DCS measurement.
+/// <summary>
+/// Sends command to stop the DCS measurement.
+/// </summary>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Stop_DCS_Measurement(void);
 
-//Enables or disables the data output of correlation data and BFI data. Intensity data is
-//always output during measurement scans
+/// <summary>
+/// Enables or disables the data output of correlation data and BFI data. Intensity data is
+/// always output during measurement scans.
+/// </summary>
+/// <param name="bCorr">Whether correlation data output should be enabled.</param>
+/// <param name="bAnalyzer">Whether analyzer data output should be enabled.</param>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Enable_DCS(bool bCorr, bool bAnalyzer);
 
-//Retrieves the last fitted correlation from the DCS.
-//The correlation data will be sent back by the driver through the callback 
-//function Get_Simulated_Correlation_CB.
+/// <summary>
+/// Retrieves the last fitted correlation from the DCS.
+/// The correlation data will be sent back by the driver through the callback 
+/// function [Get_Simulated_Correlation_CB].
+/// </summary>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Get_Simulated_Correlation(void);
 
-//Sets optical parameters.
+/// <summary>
+/// Sends the optical parameters to the DCS.
+/// </summary>
+/// <param name="pOpt_Param">Array of optical parameters.</param>
+/// <param name="Cha_Num">Length of <paramref name="pOpt_Param"/> array.</param>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Set_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num);
 
-//Configures the analyzer settings in the DCS using the data in the array pAnalyzer_Setting
+/// <summary>
+/// Send analyzer prefit parameter settings to the DCS.
+/// </summary>
+/// <param name="pAnalyzer_Prefit_Param">Analyzer prefit parameter settings.</param>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param);
 
-//Retrieves the prefit parameters from the DCS.
-//The correlation data will be sent back by the driver through the callback 
-//function Get_Analyzer_Prefit_Param_CB.
+/// <summary>
+/// Retrieves the prefit parameters from the DCS.
+/// The correlation data will be sent back by the driver through the callback 
+/// function [Get_Analyzer_Prefit_Param_CB].
+/// </summary>
+/// <returns>Standard DCS status code.</returns>
 __declspec(dllexport) int Get_Analyzer_Prefit_Param(void);

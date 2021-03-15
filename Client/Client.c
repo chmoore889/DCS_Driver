@@ -113,6 +113,7 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, 
 }
 
 int main(void) {
+	//Needed to detect and output memory leaks in debug mode.
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
 
 	int result = 0;
@@ -219,6 +220,7 @@ int main(void) {
 	result = Get_Analyzer_Prefit_Param();
 #endif // 11
 
+	//Sleep to give time for COM task to receive data and call callbacks.
 	Sleep(2000);
 
 	Destroy_COM_Task();
