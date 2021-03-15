@@ -142,10 +142,12 @@ typedef struct {
 
 //Starts the COM task for the DCS driver. Not necessary to call before other functions,
 //which will be queued up and sent once the task is initialized. Takes the address of the DCS
-//and a structure of callbacks for the COM task to call when receiving data.
+//and a structure of callbacks for the COM task to call when receiving data. Can be called multiple
+//times without calling [Destroy_COM_Task] to change the callbacks being used, but not the address.
 __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks);
 
-//Destroys an already created COM task.
+//Destroys an already created COM task. Should be called when no more data is to be sent or received.
+//Also needs to be called to change the IP address of the DCS.
 __declspec(dllexport) int Destroy_COM_Task(void);
 
 //Initiates the command to retrieve the status of the DCS.
