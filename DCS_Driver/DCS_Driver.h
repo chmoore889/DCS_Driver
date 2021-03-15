@@ -140,7 +140,7 @@ typedef struct {
 //Public API
 ////////////
 
-//
+//Starts the COM task for the DCS driver. Not necessary to call before other functions,
 //which will be queued up and sent once the task is initialized. Takes the address of the DCS
 //and a structure of callbacks for the COM task to call when receiving data.
 
