@@ -2,6 +2,12 @@
 
 #include <stdbool.h>
 
+#ifdef DCS_DRIVER_EXPORTS
+#define DCS_DRIVER_API __declspec(dllexport)
+#else
+#define DCS_DRIVER_API __declspec(dllimport)
+#endif
+
 //DCS Error Codes
 #define NO_DCS_ERROR 0
 #define FRAME_CHECKSUM_ERROR -1
@@ -152,35 +158,35 @@ typedef struct {
 /// <param name="local_callbacks">Structure of callbacks for the COM task
 /// to call when data is received.</param>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks);
+DCS_DRIVER_API int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks);
 
 /// <summary>
 /// Destroys an already created COM task. Should be called when no more data is to be sent or received.
 /// Also needs to be called to change the IP address of the DCS.
 /// </summary>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Destroy_COM_Task(void);
+DCS_DRIVER_API int Destroy_COM_Task(void);
 
 /// <summary>
 /// Initiates the command to retrieve the status of the DCS. The data will be sent back by the driver
 /// through the callback function [Get_DCS_Status_CB].
 /// </summary>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Get_DCS_Status(void);
+DCS_DRIVER_API int Get_DCS_Status(void);
 
 /// <summary>
 /// Configures the correlator settings in the DCS.
 /// </summary>
 /// <param name="pCorr_Setting">The settings to send to the DCS.</param>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Set_Correlator_Setting(Correlator_Setting_Type* pCorr_Setting);
+DCS_DRIVER_API int Set_Correlator_Setting(Correlator_Setting_Type* pCorr_Setting);
 
 /// <summary>
 /// Initiates the command to retrieve the correlator settings of the DCS. The settings data will be
 /// sent back by the driver through the callback function [Get_Correlator_Setting_CB].
 /// </summary>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Get_Correlator_Setting(void);
+DCS_DRIVER_API int Get_Correlator_Setting(void);
 
 /// <summary>
 /// Configures the analyzer settings of the DCS.
@@ -189,14 +195,14 @@ __declspec(dllexport) int Get_Correlator_Setting(void);
 /// <param name="Cha_Num">Number of DCS channels. Should equal the length of the
 /// <paramref name="pAnalyzer_Setting"/> array.</param>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Set_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
+DCS_DRIVER_API int Set_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
 
 /// <summary>
 /// Retrieves the last fitted correlation from the DCS. The correlation data will be sent back by the
 /// driver through the callback function [Get_Analyzer_Setting_CB].
 /// </summary>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Get_Analyzer_Setting(void);
+DCS_DRIVER_API int Get_Analyzer_Setting(void);
 
 /// <summary>
 /// Sends command to start the DCS measurement.
@@ -205,13 +211,13 @@ __declspec(dllexport) int Get_Analyzer_Setting(void);
 /// <param name="pCha_IDs">Array of channel ids.</param>
 /// <param name="Cha_Num">Length of the <paramref name="pCha_IDs"/> array.</param>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Start_DCS_Measurement(int interval, int* pCha_IDs, int Cha_Num);
+DCS_DRIVER_API int Start_DCS_Measurement(int interval, int* pCha_IDs, int Cha_Num);
 
 /// <summary>
 /// Sends command to stop the DCS measurement.
 /// </summary>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Stop_DCS_Measurement(void);
+DCS_DRIVER_API int Stop_DCS_Measurement(void);
 
 /// <summary>
 /// Enables or disables the data output of correlation data and BFI data. Intensity data is
@@ -220,7 +226,7 @@ __declspec(dllexport) int Stop_DCS_Measurement(void);
 /// <param name="bCorr">Whether correlation data output should be enabled.</param>
 /// <param name="bAnalyzer">Whether analyzer data output should be enabled.</param>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Enable_DCS(bool bCorr, bool bAnalyzer);
+DCS_DRIVER_API int Enable_DCS(bool bCorr, bool bAnalyzer);
 
 /// <summary>
 /// Retrieves the last fitted correlation from the DCS.
@@ -228,7 +234,7 @@ __declspec(dllexport) int Enable_DCS(bool bCorr, bool bAnalyzer);
 /// function [Get_Simulated_Correlation_CB].
 /// </summary>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Get_Simulated_Correlation(void);
+DCS_DRIVER_API int Get_Simulated_Correlation(void);
 
 /// <summary>
 /// Sends the optical parameters to the DCS.
@@ -236,14 +242,14 @@ __declspec(dllexport) int Get_Simulated_Correlation(void);
 /// <param name="pOpt_Param">Array of optical parameters.</param>
 /// <param name="Cha_Num">Length of <paramref name="pOpt_Param"/> array.</param>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Set_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num);
+DCS_DRIVER_API int Set_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num);
 
 /// <summary>
 /// Send analyzer prefit parameter settings to the DCS.
 /// </summary>
 /// <param name="pAnalyzer_Prefit_Param">Analyzer prefit parameter settings.</param>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param);
+DCS_DRIVER_API int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param);
 
 /// <summary>
 /// Retrieves the prefit parameters from the DCS.
@@ -251,4 +257,4 @@ __declspec(dllexport) int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* 
 /// function [Get_Analyzer_Prefit_Param_CB].
 /// </summary>
 /// <returns>Standard DCS status code.</returns>
-__declspec(dllexport) int Get_Analyzer_Prefit_Param(void);
+DCS_DRIVER_API int Get_Analyzer_Prefit_Param(void);
