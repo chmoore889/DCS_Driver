@@ -98,13 +98,25 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 		return result;
 	}
 
+	DCS_Address* thread_address = malloc(sizeof(*thread_address));
+	if (thread_address == NULL) {
+		CloseHandle(hRunMutex);
+		hRunMutex = NULL;
+		close_FIFO_mutex();
+		close_Callback_mutex();
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	*thread_address = address;
+
 	//Start the COM task thread, calling the COM_Task function.
-	threadHandle = (HANDLE)_beginthread(COM_Task, 0, &address);
+	threadHandle = (HANDLE)_beginthread(COM_Task, 0, thread_address);
 	if (threadHandle == NULL || PtrToLong(threadHandle) == -1L) {
 		CloseHandle(hRunMutex);
 		hRunMutex = NULL;
 		close_FIFO_mutex();
 		close_Callback_mutex();
+		free(thread_address);
 		threadHandle = NULL;
 		return THREAD_START_ERROR;
 	}
@@ -257,6 +269,7 @@ static void COM_Task(void* address) {
 	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
 	if (iResult != 0) {
 		printf("WSAStartup failed with error: %d\n", iResult);
+		free(dcs_address);
 		_endthread();
 		return;
 	}
@@ -268,6 +281,7 @@ static void COM_Task(void* address) {
 
 	//Resolve the server address and port.
 	iResult = getaddrinfo(dcs_address->address, dcs_address->port, &hints, &result);
+	free(dcs_address);
 	if (iResult != 0) {
 		printf("getaddrinfo failed with error: %d\n", iResult);
 		WSACleanup();
