@@ -83,7 +83,7 @@ typedef struct {
 } Corr_Intensity_Data_Type;
 
 //Structure for DCS address data.
-typedef struct DCS_Address {
+typedef struct {
 	const char* address; //IP Address of the DCS
 	const char* port; //Port of the DCS
 } DCS_Address;
