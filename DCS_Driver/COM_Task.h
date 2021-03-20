@@ -40,3 +40,19 @@ void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num);
 void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size);
 void Get_BFI_Corr_Ready_CB(bool bReady);
 void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);
+
+typedef enum { DCS_Status_Type } Data_Item_Type;
+
+typedef struct Received_Data_Item {
+	char* data;
+	Data_Item_Type data_type;
+	struct Received_Data_Item* pNextItem;
+} Received_Data_Item;
+
+typedef struct {
+	bool bCorr;
+	bool bAnalyzer;
+	int DCS_Cha_Num;
+} DCS_Status;
+
+__declspec(dllexport) int Get_DCS_Status_Data(DCS_Status* output);
