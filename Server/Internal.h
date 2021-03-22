@@ -89,7 +89,7 @@ typedef struct {
 	int Data_N; //data number for correlation computation
 	int Scale; //determine the number of correlation values (8*Scale)
 	float Corr_Time; //The duration for the correlation
-} Correlator_Setting_Type;
+} Correlator_Setting;
 
 typedef struct {
 	float Alpha; // error threshold for fitting
@@ -99,7 +99,7 @@ typedef struct {
 	float musp; // light scattering coefficient (1/cm)
 	float Db; // initial Db value 5X10 -9
 	float Beta; // initial Beta value 0.5
-} Analyzer_Setting_Type;
+} Analyzer_Setting;
 
 typedef struct {
 	int Precut; // Start index of raw correlation
@@ -114,7 +114,7 @@ typedef struct {
 						// be below this threshold
 	bool Model; // selection of DCS model, FALSE: semi-infinite
 				// TRUE: infinite
-} Analyzer_Prefit_Param_Type;
+} Analyzer_Prefit_Param;
 
 typedef struct {
 	int Precut; // Index corresponds to the correlation
@@ -124,7 +124,7 @@ typedef struct {
 	int Data_Num; // number of correlation values
 	float* pCorrBuf; // Array of single precision values for the
 					 // fitted correlation
-} Simulated_Corr_Type;
+} Simulated_Correlation;
 
 typedef struct {
 	int Cha_ID; // channel ID

@@ -5,7 +5,7 @@ __declspec(dllexport) int Get_DCS_Status(void) {
 	return Send_Get_DSC_Status();
 }
 
-__declspec(dllexport) int Set_Correlator_Setting(Correlator_Setting_Type* pCorr_Setting) {
+__declspec(dllexport) int Set_Correlator_Setting(Correlator_Setting* pCorr_Setting) {
 	return Send_Correlator_Setting(pCorr_Setting);
 }
 
@@ -13,7 +13,7 @@ __declspec(dllexport) int Get_Correlator_Setting(void) {
 	return Send_Get_Correlator_Setting();
 }
 
-__declspec(dllexport) int Set_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num) {
+__declspec(dllexport) int Set_Analyzer_Setting(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num) {
 	return Send_Analyzer_Setting(pAnalyzer_Setting, Cha_Num);
 }
 
@@ -41,7 +41,7 @@ __declspec(dllexport) int Set_Optical_Param(Optical_Param_Type* pOpt_Param, int 
 	return Send_Optical_Param(pOpt_Param, Cha_Num);
 }
 
-__declspec(dllexport) int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param) {
+__declspec(dllexport) int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param* pAnalyzer_Prefit_Param) {
 	return Send_Analyzer_Prefit_Param(pAnalyzer_Prefit_Param);
 }
 

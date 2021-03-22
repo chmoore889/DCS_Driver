@@ -32,16 +32,24 @@ int Check_Command_Response(int Option, int Command_Code);
 /////////////////////////////////////////////////////////////////
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num);
-void Get_Correlator_Setting_CB(Correlator_Setting_Type* pCorrelator_Setting);
-void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
-void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit);
-void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr);
-void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num);
+void Get_Correlator_Setting_CB(Correlator_Setting* pCorrelator_Setting);
+void Get_Analyzer_Setting_CB(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num);
+void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param* pAnalyzer_Prefit);
+void Get_Simulated_Correlation_CB(Simulated_Correlation* Simulated_Corr);
+void Get_BFI_Data(BFI_Data* pBFI_Data, int Cha_Num);
 void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size);
 void Get_BFI_Corr_Ready_CB(bool bReady);
-void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);
+void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);
 
-typedef enum { DCS_Status_Type } Data_Item_Type;
+typedef enum {
+	DCS_Status_Type,
+	Correlator_Setting_Type,
+	Analyzer_Setting_Type,
+	Analyzer_Prefit_Param_Type,
+	Simulated_Correlation_Type,
+	BFI_Data_Type,
+	Corr_Intensity_Data_Type,
+} Data_Item_Type;
 
 typedef struct Received_Data_Item {
 	char* data;
@@ -56,3 +64,8 @@ typedef struct {
 } DCS_Status;
 
 __declspec(dllexport) int Get_DCS_Status_Data(DCS_Status* output);
+__declspec(dllexport) int Get_Correlator_Setting_Data(Correlator_Setting* output);
+//__declspec(dllexport) int Get_Analyzer_Setting_Data(Analyzer_Setting* pAnalyzer_Setting, int* Cha_Num);
+__declspec(dllexport) int Get_Analyzer_Prefit_Param_Data(Analyzer_Prefit_Param* output);
+__declspec(dllexport) int Get_Simulated_Correlation_Data(Simulated_Correlation* output);
+//__declspec(dllexport) int Get_BFI_Data_Data(BFI_Data* pBFI_Data, int Cha_Num);

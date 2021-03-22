@@ -21,12 +21,12 @@ void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("%d\n", DCS_Cha_Num);
 }
 
-void Get_Correlator_Setting_CB(Correlator_Setting_Type* pCorrelator_Setting) {
+void Get_Correlator_Setting_CB(Correlator_Setting* pCorrelator_Setting) {
 	printf("Correlator Setting:\n");
 	printf("%f\n%d\n%d\n", pCorrelator_Setting->Corr_Time, pCorrelator_Setting->Data_N, pCorrelator_Setting->Scale);
 }
 
-void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num) {
+void Get_Analyzer_Setting_CB(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num) {
 	printf("Analyzer Settings:\n");
 	for (int x = 0; x < Cha_Num; x++) {
 		printf("Setting #%d\n", x);
@@ -40,7 +40,7 @@ void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_N
 	}
 }
 
-void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit) {
+void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param* pAnalyzer_Prefit) {
 	printf("Analyzer Prefit Params:\n");
 	printf("Precut: %d\n", pAnalyzer_Prefit->Precut);
 	printf("PostCut: %d\n", pAnalyzer_Prefit->PostCut);
@@ -52,7 +52,7 @@ void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit) 
 	printf("Model: %s\n", pAnalyzer_Prefit->Model ? "true" : "false");
 }
 
-void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
+void Get_Simulated_Correlation_CB(Simulated_Correlation* Simulated_Corr) {
 	printf("Simulated Correlation:\n");
 	printf("Precut: %d\n", Simulated_Corr->Precut);
 	printf("Cha_ID: %d\n", Simulated_Corr->Cha_ID);
@@ -65,7 +65,7 @@ void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
 	printf("]\n");
 }
 
-void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num) {
+void Get_BFI_Data(BFI_Data* pBFI_Data, int Cha_Num) {
 	printf("BFI Data:\n");
 	for (int x = 0; x < Cha_Num; x++) {
 		printf("Settings %d\n", x);
@@ -94,7 +94,7 @@ void Get_BFI_Corr_Ready_CB(bool bReady) {
 	printf("%s\n", bReady ? "true" : "false");
 }
 
-void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num) {
+void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num) {
 	printf("Corr Intensity Data:\n");
 	for (int x = 0; x < Cha_Num; x++) {
 		printf("Data %d:\n", pCorr_Intensity_Data[x].Cha_ID);

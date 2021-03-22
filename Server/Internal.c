@@ -260,7 +260,7 @@ static int Process_Corr_Status(char** to_send_data, unsigned int* to_send_data_s
 }
 
 static int Process_Analyzer_Set(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size) {
-	Analyzer_Setting_Type* settings;
+	Analyzer_Setting* settings;
 	int Cha_Num;
 
 	//Copy prepended number of channels to local
@@ -307,7 +307,7 @@ static int Process_Analyzer_Set(char* received_data, unsigned int received_data_
 //Allocates and writes Analyzer settings to_send_data buffer and outputs size to_send_data_size
 static int Process_Analyzer_Status(char** to_send_data, unsigned int* to_send_data_size) {
 	int Cha_Num = 5; //Fake cha num for testing
-	Analyzer_Setting_Type* data;
+	Analyzer_Setting* data;
 
 	//Make fake analyzer setting data for testing
 	data = malloc(sizeof(*data) * Cha_Num);
@@ -316,7 +316,7 @@ static int Process_Analyzer_Status(char** to_send_data, unsigned int* to_send_da
 	}
 
 	for (int x = 0; x < Cha_Num; x++) {
-		data[x] = (Analyzer_Setting_Type){
+		data[x] = (Analyzer_Setting){
 			.Alpha = (float) 10.8 - x,
 			.Beta = (float) 9.7 - x,
 			.Db = (float) 8.6 - x,
@@ -330,7 +330,7 @@ static int Process_Analyzer_Status(char** to_send_data, unsigned int* to_send_da
 	Data_ID data_id = GET_ANALYZER_SETTING;
 	size_t index = 0;
 
-	*to_send_data_size = sizeof(data_id) + sizeof(Cha_Num) + sizeof(Analyzer_Setting_Type) * Cha_Num;
+	*to_send_data_size = sizeof(data_id) + sizeof(Cha_Num) + sizeof(Analyzer_Setting) * Cha_Num;
 	*to_send_data = malloc(*to_send_data_size);
 	if (*to_send_data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
@@ -513,7 +513,7 @@ static int Process_Optical_Set(char* received_data, unsigned int received_data_s
 }
 
 static int Process_Analyzer_Prefit(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size) {
-	Analyzer_Prefit_Param_Type prefit;
+	Analyzer_Prefit_Param prefit;
 
 #pragma warning (disable: 6386 6385)
 	memcpy(&prefit, received_data, sizeof(prefit));
@@ -543,10 +543,10 @@ static int Process_Analyzer_Prefit(char* received_data, unsigned int received_da
 
 //Allocates and writes Analyzer prefit params to_send_data buffer and outputs size to_send_data_size
 static int Process_Get_Analyzer_Prefit(char** to_send_data, unsigned int* to_send_data_size) {
-	Analyzer_Prefit_Param_Type data;
+	Analyzer_Prefit_Param data;
 
 	//Make fake analyzer prefit data for testing
-	data = (Analyzer_Prefit_Param_Type){
+	data = (Analyzer_Prefit_Param){
 		.Precut = 1,
 		.PostCut = 2,
 		.Min_Intensity = 1.7F,

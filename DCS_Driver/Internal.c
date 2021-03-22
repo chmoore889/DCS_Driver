@@ -37,7 +37,7 @@ int Receive_DCS_Status(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
-int Send_Correlator_Setting(Correlator_Setting_Type* pCorrelator_Setting) {
+int Send_Correlator_Setting(Correlator_Setting* pCorrelator_Setting) {
 	char* pDataBuf; //data buffer for the byte stream of the correlator setting data
 	const unsigned __int32 BufferSize = sizeof(*pCorrelator_Setting); //data size of the buffer pDataBuf
 
@@ -83,7 +83,7 @@ int Send_Get_Correlator_Setting(void) {
 }
 
 int Receive_Correlator_Setting(char* pDataBuf) {
-	Correlator_Setting_Type* pCorrelator_Setting = malloc(sizeof(Correlator_Setting_Type));
+	Correlator_Setting* pCorrelator_Setting = malloc(sizeof(Correlator_Setting));
 	if (pCorrelator_Setting == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
@@ -124,7 +124,7 @@ int Receive_Correlator_Setting(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
-int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, unsigned __int32 Cha_Num) {
+int Send_Analyzer_Setting(Analyzer_Setting* pAnalyzer_Setting, unsigned __int32 Cha_Num) {
 	char* pDataBuf; //Data buffer for the byte stream of the analyzer setting data.
 	unsigned __int32 index = 0;//Keeps track of the current pDataBuf index
 	const unsigned __int32 BufferSize = sizeof(Cha_Num) + Cha_Num * sizeof(*pAnalyzer_Setting);
@@ -144,7 +144,7 @@ int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, unsigned __i
 	//Change analyzer settings to network byte order
 
 	//Allocate memory for the output byte order struct.
-	Analyzer_Setting_Type* network_Analyzer = malloc(Cha_Num * sizeof(Analyzer_Setting_Type));
+	Analyzer_Setting* network_Analyzer = malloc(Cha_Num * sizeof(Analyzer_Setting));
 	if (network_Analyzer == NULL) {
 		free(pDataBuf);
 		return MEMORY_ALLOCATION_ERROR;
@@ -181,7 +181,7 @@ int Send_Get_Analyzer_Setting(void) {
 int Receive_Analyzer_Setting(char* pDataBuf) {
 	unsigned __int32 index = 0;//Keeps track of the current pDataBuf index.
 
-	Analyzer_Setting_Type* pAnalyzer_Setting;
+	Analyzer_Setting* pAnalyzer_Setting;
 	unsigned __int32 Cha_Num;
 
 	memcpy(&Cha_Num, &pDataBuf[index], sizeof(Cha_Num));
@@ -299,7 +299,7 @@ int Send_Get_Simulated_Correlation(void) {
 int Receive_Simulated_Correlation(char* pDataBuf) {
 	unsigned __int32 index = 0;//Keeps track of the current pDataBuf index.
 
-	Simulated_Corr_Type Simulated_Corr = { 0 };
+	Simulated_Correlation Simulated_Corr = { 0 };
 
 	memcpy(&Simulated_Corr.Precut, &pDataBuf[index], sizeof(Simulated_Corr.Precut));
 	index += sizeof(Simulated_Corr.Precut);
@@ -378,7 +378,7 @@ int Send_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num) {
 	return result;
 }
 
-int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param) {
+int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param* pAnalyzer_Prefit_Param) {
 	char* pDataBuf;
 	const unsigned __int32 BufferSize = sizeof(*pAnalyzer_Prefit_Param);
 
@@ -390,7 +390,7 @@ int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Para
 
 #pragma warning (disable: 6386 6385)
 	//Change params to network byte order
-	Analyzer_Prefit_Param_Type network_Analyzer = { 0 };
+	Analyzer_Prefit_Param network_Analyzer = { 0 };
 
 	network_Analyzer.Precut = htool(pAnalyzer_Prefit_Param->Precut);
 	network_Analyzer.PostCut = htool(pAnalyzer_Prefit_Param->PostCut);
@@ -417,7 +417,7 @@ int Send_Get_Analyzer_Prefit_Param(void) {
 }
 
 int Receive_Analyzer_Prefit_Param(char* pDataBuf) {
-	Analyzer_Prefit_Param_Type pAnalyzer_Prefit_Param;
+	Analyzer_Prefit_Param pAnalyzer_Prefit_Param;
 
 #pragma warning (disable: 6386 6385)
 	//Copy received data to struct.
@@ -475,7 +475,7 @@ int Receive_BFI_Data(char* pDataBuf) {
 	numChannels = itohl(numChannels);
 
 	//Pointer to the memory storing the BFI data structure array.
-	BFI_Data_Type* pBFI_Data = malloc(numChannels * sizeof(*pBFI_Data));
+	BFI_Data* pBFI_Data = malloc(numChannels * sizeof(*pBFI_Data));
 	if (pBFI_Data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
@@ -485,7 +485,7 @@ int Receive_BFI_Data(char* pDataBuf) {
 		unsigned __int32 rawDataOffset = sizeof(numChannels) + x * sizeof(*pBFI_Data);
 
 		//For each struct member, copy from the input buffer and change to host byte order.
-		BFI_Data_Type* currentBFI = &pBFI_Data[x];
+		BFI_Data* currentBFI = &pBFI_Data[x];
 		memcpy(&currentBFI->Cha_ID, &pDataBuf[rawDataOffset], sizeof(currentBFI->Cha_ID));
 		currentBFI->Cha_ID = itohl(currentBFI->Cha_ID);
 		rawDataOffset += sizeof(currentBFI->Cha_ID);
@@ -526,7 +526,7 @@ int Receive_Corr_Intensity_Data(char* pDataBuf) {
 	index += sizeof(numChannels);
 
 	//Allocating memory for numChannels channels of data.
-	Corr_Intensity_Data_Type* pCorr_Intensity_Data = malloc(sizeof(*pCorr_Intensity_Data) * numChannels);
+	Corr_Intensity_Data* pCorr_Intensity_Data = malloc(sizeof(*pCorr_Intensity_Data) * numChannels);
 	if (pCorr_Intensity_Data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}

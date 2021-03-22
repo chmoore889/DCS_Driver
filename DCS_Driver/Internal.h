@@ -113,7 +113,7 @@ int Send_Get_DSC_Status(void);
 int Receive_DCS_Status(char* pDataBuf);
 
 //Sends command to set the passed correlator settings.
-int Send_Correlator_Setting(Correlator_Setting_Type* pCorrelator_Setting);
+int Send_Correlator_Setting(Correlator_Setting* pCorrelator_Setting);
 
 //This function is called by the function Get_Correlator_Setting. It calls the function
 //Send_DCS_Command to send the “Get Correlator Settings” command to the DCS. The data will
@@ -122,7 +122,7 @@ int Send_Get_Correlator_Setting(void);
 int Receive_Correlator_Setting(char* pDataBuf);
 
 //Sends command to set the passed analyzer settings.
-int Send_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, unsigned __int32 Cha_Num);
+int Send_Analyzer_Setting(Analyzer_Setting* pAnalyzer_Setting, unsigned __int32 Cha_Num);
 
 //This function is called by the function Get_Analyzer_Setting. It calls the function
 //Send_DCS_Command to send the “Get Analyzer Settings” command to the DCS. The data will
@@ -150,7 +150,7 @@ int Receive_Simulated_Correlation(char* pDataBuf);
 int Send_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num);
 
 //Sends command to set the passed prefit paramters.
-int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param);
+int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param* pAnalyzer_Prefit_Param);
 
 //This function is called by the function Get_Analyzer_Prefit_Param. It calls the function
 //Send_DCS_Command to send the “Get Analyzer Prefit Param” command to the DCS. The data will

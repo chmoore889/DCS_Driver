@@ -667,7 +667,7 @@ void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	}
 
 	data->data_type = DCS_Status_Type;
-	data->data = malloc(sizeof(DCS_Status));
+	data->data = malloc(sizeof(status));
 	if (data->data == NULL) {
 		free(data);
 		return;
@@ -680,54 +680,71 @@ void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 
 GETTER_FUNCTION(DCS_Status)
 
-//__declspec(dllexport) int Get_DCS_Status_Data(DCS_Status* output) {
-//	Received_Data_Item* item = pRecv_Data_FIFO_Head;
-//	Received_Data_Item* prev_item = NULL;
-//	while (item != NULL) {
-//		if (item->data_type == DCS_Status_Type) {
-//			memcpy(output, item->data, sizeof(*output));
-//
-//			if (prev_item != NULL) {
-//				prev_item->pNextItem = item->pNextItem;
-//				if (prev_item->pNextItem == NULL) {
-//					pRecv_Data_FIFO_Tail = prev_item;
-//				}
-//			}
-//			else {
-//				pRecv_Data_FIFO_Head = item->pNextItem;
-//				if (pRecv_Data_FIFO_Head == NULL) {
-//					pRecv_Data_FIFO_Tail = NULL;
-//				}
-//			}
-//
-//			free(item->data);
-//			free(item);
-//			return NO_DCS_ERROR;
-//		}
-//
-//		prev_item = item;
-//		item = item->pNextItem;
-//	}
-//	return 1;
-//}
+void Get_Correlator_Setting_CB(Correlator_Setting* pCorrelator_Setting) {
+	Received_Data_Item* data = malloc(sizeof(*data));
+	if (data == NULL) {
+		return;
+	}
 
-void Get_Correlator_Setting_CB(Correlator_Setting_Type* pCorrelator_Setting) {
+	data->data_type = DCS_Status_Type;
+	data->data = malloc(sizeof(*pCorrelator_Setting));
+	if (data->data == NULL) {
+		free(data);
+		return;
+	}
+
+	memcpy(data->data, pCorrelator_Setting, sizeof(*pCorrelator_Setting));
+
+	Enqueue_Recv_FIFO(data);
+}
+
+GETTER_FUNCTION(Correlator_Setting)
+
+void Get_Analyzer_Setting_CB(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num) {
 	
 }
 
-void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num) {
-	
+void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param* pAnalyzer_Prefit) {
+	Received_Data_Item* data = malloc(sizeof(*data));
+	if (data == NULL) {
+		return;
+	}
+
+	data->data_type = DCS_Status_Type;
+	data->data = malloc(sizeof(*pAnalyzer_Prefit));
+	if (data->data == NULL) {
+		free(data);
+		return;
+	}
+
+	memcpy(data->data, pAnalyzer_Prefit, sizeof(*pAnalyzer_Prefit));
+
+	Enqueue_Recv_FIFO(data);
 }
 
-void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit) {
-	
+GETTER_FUNCTION(Analyzer_Prefit_Param)
+
+void Get_Simulated_Correlation_CB(Simulated_Correlation* Simulated_Corr) {
+	Received_Data_Item* data = malloc(sizeof(*data));
+	if (data == NULL) {
+		return;
+	}
+
+	data->data_type = DCS_Status_Type;
+	data->data = malloc(sizeof(*Simulated_Corr));
+	if (data->data == NULL) {
+		free(data);
+		return;
+	}
+
+	memcpy(data->data, Simulated_Corr, sizeof(*Simulated_Corr));
+
+	Enqueue_Recv_FIFO(data);
 }
 
-void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
-	
-}
+GETTER_FUNCTION(Simulated_Correlation)
 
-void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num) {
+void Get_BFI_Data(BFI_Data* pBFI_Data, int Cha_Num) {
 	
 }
 
@@ -739,6 +756,6 @@ void Get_BFI_Corr_Ready_CB(bool bReady) {
 	
 }
 
-void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num) {
+void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num) {
 	
 }

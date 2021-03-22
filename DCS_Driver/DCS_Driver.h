@@ -25,7 +25,7 @@ typedef struct {
 	int Data_N; //data number for correlation computation
 	int Scale; //determine the number of correlation values (8*Scale)
 	float Corr_Time; //The duration for the correlation
-} Correlator_Setting_Type;
+} Correlator_Setting;
 
 typedef struct {
 	float Alpha; // error threshold for fitting
@@ -35,7 +35,7 @@ typedef struct {
 	float musp; // light scattering coefficient (1/cm)
 	float Db; // initial Db value 5X10 -9
 	float Beta; // initial Beta value 0.5
-} Analyzer_Setting_Type;
+} Analyzer_Setting;
 
 typedef struct {
 	int Precut; // Start index of raw correlation
@@ -50,7 +50,7 @@ typedef struct {
 						// be below this threshold
 	bool Model; // selection of DCS model, FALSE: semi-infinite
 				// TRUE: infinite
-} Analyzer_Prefit_Param_Type;
+} Analyzer_Prefit_Param;
 
 typedef struct {
 	int Precut; // Index corresponds to the correlation
@@ -60,7 +60,7 @@ typedef struct {
 	int Data_Num; // number of correlation values
 	float* pCorrBuf; // Array of single precision values for the
 					 // fitted correlation
-} Simulated_Corr_Type;
+} Simulated_Correlation;
 
 typedef struct {
 	int Cha_ID; // channel ID
@@ -73,14 +73,14 @@ typedef struct {
 	float BFI; // absolute blood flow index
 	float Beta; // β value in the fitting
 	float rMSE; // relative mean square error
-} BFI_Data_Type;
+} BFI_Data;
 
 typedef struct {
 	int Cha_ID; //Channel ID
 	float intensity; //intensity of the optical channel
 	int Data_Num; //number of the correlation value
 	float* pCorrBuf; //pointer to the buffer of the correlation values
-} Corr_Intensity_Data_Type;
+} Corr_Intensity_Data;
 
 //Structure for DCS address data.
 typedef struct {
@@ -97,28 +97,28 @@ typedef struct {
 typedef void(*Get_DCS_Status_CB_Def)(bool bCorr, bool bAnalyzer, int DCS_Cha_Num);
 
 //Callback for Get_Correlator_Setting.
-typedef void(*Get_Correlator_Setting_CB_Def)(Correlator_Setting_Type* pCorrelator_Setting);
+typedef void(*Get_Correlator_Setting_CB_Def)(Correlator_Setting* pCorrelator_Setting);
 
 //Callback for Get_Analyzer_Setting.
-typedef void(*Get_Analyzer_Setting_CB_Def)(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
+typedef void(*Get_Analyzer_Setting_CB_Def)(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num);
 
 //Callback for Get_Simulated_Correlation
-typedef void(*Get_Simulated_Correlation_CB_Def)(Simulated_Corr_Type* Simulated_Corr);
+typedef void(*Get_Simulated_Correlation_CB_Def)(Simulated_Correlation* Simulated_Corr);
 
 //Callback for Get_Analyzer_Prefit_Param
-typedef void(*Get_Analyzer_Prefit_Param_CB_Def)(Analyzer_Prefit_Param_Type* pAnalyzer_Setting);
+typedef void(*Get_Analyzer_Prefit_Param_CB_Def)(Analyzer_Prefit_Param* pAnalyzer_Setting);
 
 //Callback for error messages that are received
 typedef void(*Get_Error_Message_CB_Def)(char* pMessage, unsigned __int32 Size);
 
 //Callback for getting BFI data.
-typedef void(*Get_BFI_Data_Def)(BFI_Data_Type* pBFI_Data, int Cha_Num);
+typedef void(*Get_BFI_Data_Def)(BFI_Data* pBFI_Data, int Cha_Num);
 
 //Callback for signaling that the BFI correlation data is ready.
 typedef void(*Get_BFI_Corr_Ready_CB_Def)(bool bReady);
 
 //Callback for getting the correlation intensity data.
-typedef void(*Get_Corr_Intensity_Data_CB_Def)(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);
+typedef void(*Get_Corr_Intensity_Data_CB_Def)(Corr_Intensity_Data* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);
 
 //Structure to hold all of the callbacks for the COM task to call.
 typedef struct {
@@ -179,7 +179,7 @@ DCS_DRIVER_API int Get_DCS_Status(void);
 /// </summary>
 /// <param name="pCorr_Setting">The settings to send to the DCS.</param>
 /// <returns>Standard DCS status code.</returns>
-DCS_DRIVER_API int Set_Correlator_Setting(Correlator_Setting_Type* pCorr_Setting);
+DCS_DRIVER_API int Set_Correlator_Setting(Correlator_Setting* pCorr_Setting);
 
 /// <summary>
 /// Initiates the command to retrieve the correlator settings of the DCS. The settings data will be
@@ -195,7 +195,7 @@ DCS_DRIVER_API int Get_Correlator_Setting(void);
 /// <param name="Cha_Num">Number of DCS channels. Should equal the length of the
 /// <paramref name="pAnalyzer_Setting"/> array.</param>
 /// <returns>Standard DCS status code.</returns>
-DCS_DRIVER_API int Set_Analyzer_Setting(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num);
+DCS_DRIVER_API int Set_Analyzer_Setting(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num);
 
 /// <summary>
 /// Retrieves the last fitted correlation from the DCS. The correlation data will be sent back by the
@@ -249,7 +249,7 @@ DCS_DRIVER_API int Set_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num
 /// </summary>
 /// <param name="pAnalyzer_Prefit_Param">Analyzer prefit parameter settings.</param>
 /// <returns>Standard DCS status code.</returns>
-DCS_DRIVER_API int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit_Param);
+DCS_DRIVER_API int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param* pAnalyzer_Prefit_Param);
 
 /// <summary>
 /// Retrieves the prefit parameters from the DCS.
