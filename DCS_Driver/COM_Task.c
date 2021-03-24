@@ -247,7 +247,7 @@ static int recv_data(SOCKET ConnectSocket) {
 //and then continuously sends and receives data until Destroy_COM_Task is called.
 static void COM_Task(void* address) {
 	DCS_Address* dcs_address = (DCS_Address*)address;
-	printf("%s", dcs_address->address);
+	//printf("%s", dcs_address->address);
 
 	WSADATA wsaData;
 	SOCKET ConnectSocket = INVALID_SOCKET;
