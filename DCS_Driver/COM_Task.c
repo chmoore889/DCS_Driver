@@ -654,6 +654,45 @@ static inline void release_Recv_mutex() {
 	return 1;\
 }
 
+#define ARRAY_GETTER_FUNCTION(arg) __declspec(dllexport) int Get_##arg##_Data(arg ## ** output, int* number) {\
+	set_Recv_mutex();\
+	Received_Data_Item* item = pRecv_Data_FIFO_Head;\
+	Received_Data_Item* prev_item = NULL;\
+	while (item != NULL) {\
+		if (item->data_type == arg ## _Type) {\
+			Array_Data arr = { 0 };\
+			memcpy(&arr, item->data, sizeof(arr));\
+\
+			*number = arr.length;\
+			memcpy(output, &arr.ptr, sizeof(*output));\
+\
+			if (prev_item != NULL) {\
+				prev_item->pNextItem = item->pNextItem;\
+				if (prev_item->pNextItem == NULL) {\
+					pRecv_Data_FIFO_Tail = prev_item;\
+				}\
+			}\
+			else {\
+				pRecv_Data_FIFO_Head = item->pNextItem;\
+				if (pRecv_Data_FIFO_Head == NULL) {\
+					pRecv_Data_FIFO_Tail = NULL;\
+				}\
+			}\
+\
+			release_Recv_mutex();\
+\
+			free(item->data);\
+			free(item);\
+			return NO_DCS_ERROR;\
+		}\
+\
+		prev_item = item;\
+		item = item->pNextItem;\
+	}\
+	release_Recv_mutex();\
+	return 1;\
+}
+
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	DCS_Status status = {
 		.bCorr = bCorr,
@@ -686,7 +725,7 @@ void Get_Correlator_Setting_CB(Correlator_Setting* pCorrelator_Setting) {
 		return;
 	}
 
-	data->data_type = DCS_Status_Type;
+	data->data_type = Correlator_Setting_Type;
 	data->data = malloc(sizeof(*pCorrelator_Setting));
 	if (data->data == NULL) {
 		free(data);
@@ -701,8 +740,27 @@ void Get_Correlator_Setting_CB(Correlator_Setting* pCorrelator_Setting) {
 GETTER_FUNCTION(Correlator_Setting)
 
 void Get_Analyzer_Setting_CB(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num) {
-	
+	Received_Data_Item* data = malloc(sizeof(*data));
+	if (data == NULL) {
+		return;
+	}
+
+	data->data_type = Analyzer_Setting_Type;
+	Array_Data* arr = malloc(sizeof(*arr));
+	if (arr == NULL) {
+		free(data);
+		return;
+	}
+
+	arr->length = Cha_Num;
+	memcpy(&arr->ptr, &pAnalyzer_Setting, sizeof(pAnalyzer_Setting));
+
+	memcpy(&data->data, &arr, sizeof(arr));
+
+	Enqueue_Recv_FIFO(data);
 }
+
+ARRAY_GETTER_FUNCTION(Analyzer_Setting)
 
 void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param* pAnalyzer_Prefit) {
 	Received_Data_Item* data = malloc(sizeof(*data));
@@ -710,7 +768,7 @@ void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param* pAnalyzer_Prefit) {
 		return;
 	}
 
-	data->data_type = DCS_Status_Type;
+	data->data_type = Analyzer_Prefit_Param_Type;
 	data->data = malloc(sizeof(*pAnalyzer_Prefit));
 	if (data->data == NULL) {
 		free(data);
@@ -730,7 +788,7 @@ void Get_Simulated_Correlation_CB(Simulated_Correlation* Simulated_Corr) {
 		return;
 	}
 
-	data->data_type = DCS_Status_Type;
+	data->data_type = Simulated_Correlation_Type;
 	data->data = malloc(sizeof(*Simulated_Corr));
 	if (data->data == NULL) {
 		free(data);
@@ -745,8 +803,27 @@ void Get_Simulated_Correlation_CB(Simulated_Correlation* Simulated_Corr) {
 GETTER_FUNCTION(Simulated_Correlation)
 
 void Get_BFI_Data(BFI_Data* pBFI_Data, int Cha_Num) {
-	
+	Received_Data_Item* data = malloc(sizeof(*data));
+	if (data == NULL) {
+		return;
+	}
+
+	data->data_type = BFI_Data_Type;
+	Array_Data* arr = malloc(sizeof(*arr));
+	if (arr == NULL) {
+		free(data);
+		return;
+	}
+
+	arr->length = Cha_Num;
+	memcpy(&arr->ptr, &pBFI_Data, sizeof(pBFI_Data));
+
+	memcpy(&data->data, &arr, sizeof(arr));
+
+	Enqueue_Recv_FIFO(data);
 }
+
+ARRAY_GETTER_FUNCTION(BFI_Data)
 
 void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
 	

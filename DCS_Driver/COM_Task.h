@@ -63,9 +63,14 @@ typedef struct {
 	int DCS_Cha_Num;
 } DCS_Status;
 
+typedef struct {
+	char* ptr;
+	int length;
+} Array_Data;
+
 __declspec(dllexport) int Get_DCS_Status_Data(DCS_Status* output);
 __declspec(dllexport) int Get_Correlator_Setting_Data(Correlator_Setting* output);
-//__declspec(dllexport) int Get_Analyzer_Setting_Data(Analyzer_Setting* pAnalyzer_Setting, int* Cha_Num);
+__declspec(dllexport) int Get_Analyzer_Setting_Data(Analyzer_Setting** pAnalyzer_Setting, int* Cha_Num);
 __declspec(dllexport) int Get_Analyzer_Prefit_Param_Data(Analyzer_Prefit_Param* output);
 __declspec(dllexport) int Get_Simulated_Correlation_Data(Simulated_Correlation* output);
-//__declspec(dllexport) int Get_BFI_Data_Data(BFI_Data* pBFI_Data, int Cha_Num);
+__declspec(dllexport) int Get_BFI_Data_Data(BFI_Data** pBFI_Data, int* Cha_Num);
