@@ -52,7 +52,7 @@ typedef enum {
 } Data_Item_Type;
 
 typedef struct Received_Data_Item {
-	char* data;
+	void* data;
 	Data_Item_Type data_type;
 	struct Received_Data_Item* pNextItem;
 } Received_Data_Item;
@@ -64,7 +64,7 @@ typedef struct {
 } DCS_Status;
 
 typedef struct {
-	char* ptr;
+	void* ptr;
 	int length;
 } Array_Data;
 

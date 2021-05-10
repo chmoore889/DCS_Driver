@@ -753,9 +753,18 @@ void Get_Analyzer_Setting_CB(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num) {
 	}
 
 	arr->length = Cha_Num;
-	memcpy(&arr->ptr, &pAnalyzer_Setting, sizeof(pAnalyzer_Setting));
 
-	memcpy(&data->data, &arr, sizeof(arr));
+	const size_t dataSize = sizeof(*pAnalyzer_Setting) * Cha_Num;
+	arr->ptr = malloc(dataSize);
+	if (arr->ptr == NULL) {
+		free(data);
+		free(arr);
+		return;
+	}
+
+	memcpy(arr->ptr, pAnalyzer_Setting, dataSize);
+
+	data->data = arr;
 
 	Enqueue_Recv_FIFO(data);
 }
@@ -816,9 +825,18 @@ void Get_BFI_Data(BFI_Data* pBFI_Data, int Cha_Num) {
 	}
 
 	arr->length = Cha_Num;
-	memcpy(&arr->ptr, &pBFI_Data, sizeof(pBFI_Data));
 
-	memcpy(&data->data, &arr, sizeof(arr));
+	const size_t dataSize = sizeof(*pBFI_Data) * Cha_Num;
+	arr->ptr = malloc(dataSize);
+	if (arr->ptr == NULL) {
+		free(data);
+		free(arr);
+		return;
+	}
+
+	memcpy(arr->ptr, pBFI_Data, dataSize);
+
+	data->data = &arr;
 
 	Enqueue_Recv_FIFO(data);
 }

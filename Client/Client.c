@@ -1,4 +1,5 @@
 #define _CRTDBG_MAP_ALLOC
+#define _WINSOCKAPI_
 #include <stdlib.h>
 #include <crtdbg.h>
 #include <stdbool.h>
@@ -7,12 +8,13 @@
 #include <windows.h>
 
 #include "DCS_Driver.h"
+#include "COM_Task.h"
 
 #define DEFAULT_PORT "50000"
 #define HOST_NAME "129.49.117.79"
 
 #define TEST_ARRAY_LEN 6
-#define FUNC_TO_TEST 0
+#define FUNC_TO_TEST 4
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("DCS Status:\n");
@@ -134,7 +136,7 @@ int main(void) {
 		.Get_BFI_Corr_Ready_CB = Get_BFI_Corr_Ready_CB,
 		.Get_Corr_Intensity_Data_CB = Get_Corr_Intensity_Data_CB,
 	};
-	result = Initialize_COM_Task(address, callbacks);
+	result = Initialize_COM_Task(address);
 	if (result != NO_DCS_ERROR) {
 		return result;
 	}
@@ -222,6 +224,17 @@ int main(void) {
 
 	//Sleep to give time for COM task to receive data and call callbacks.
 	Sleep(2000);
+
+	Analyzer_Setting** status = calloc(sizeof * *status, 1);
+
+	int num = 0;
+
+	int res = Get_Analyzer_Setting_Data(status, &num);
+	printf("Ret val: %d\n", res);
+	Get_Analyzer_Setting_CB(*status, num);
+
+	free(*status);
+	free(status);
 
 	Destroy_COM_Task();
 	return result;
