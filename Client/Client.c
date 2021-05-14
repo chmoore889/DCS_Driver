@@ -14,7 +14,7 @@
 #define HOST_NAME "129.49.117.79"
 
 #define TEST_ARRAY_LEN 6
-#define FUNC_TO_TEST 4
+#define FUNC_TO_TEST 5
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("DCS Status:\n");
@@ -225,13 +225,19 @@ int main(void) {
 	//Sleep to give time for COM task to receive data and call callbacks.
 	Sleep(2000);
 
-	Analyzer_Setting** status = calloc(sizeof * *status, 1);
+	BFI_Data** status = calloc(sizeof *status, 1);
 
-	int num = 0;
+	while (1) {
+		int num = 0;
 
-	int res = Get_Analyzer_Setting_Data(status, &num);
-	printf("Ret val: %d\n", res);
-	Get_Analyzer_Setting_CB(*status, num);
+		int res = Get_BFI_Data_Data(status, &num);
+		//printf("Ret val: %d\n", res);
+		if (res != NO_DCS_ERROR) {
+			break;
+		}
+
+		Get_BFI_Data(*status, num);
+	}
 
 	free(*status);
 	free(status);
