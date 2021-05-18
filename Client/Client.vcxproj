@@ -159,9 +159,12 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
-    <ClCompile Include="..\DCS_Driver\COM_Task.c" />
-    <ClCompile Include="..\DCS_Driver\DCS_Driver.c" />
     <ClCompile Include="Client.c" />
+  </ItemGroup>
+  <ItemGroup>
+    <ProjectReference Include="..\DCS_Driver\DCS_Driver.vcxproj">
+      <Project>{61692ed4-c14c-4756-b982-20826f3e7f34}</Project>
+    </ProjectReference>
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">
