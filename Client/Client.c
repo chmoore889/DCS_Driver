@@ -223,7 +223,7 @@ int main(void) {
 #endif // 11
 
 	//Sleep to give time for COM task to receive data and call callbacks.
-	Sleep(2000);
+	Sleep(30000);
 
 	BFI_Data** status = calloc(sizeof *status, 1);
 
@@ -237,10 +237,12 @@ int main(void) {
 		}
 
 		Get_BFI_Data(*status, num);
+		free(*status);
 	}
 
-	free(*status);
 	free(status);
+
+	Sleep(2000);
 
 	Destroy_COM_Task();
 	return result;

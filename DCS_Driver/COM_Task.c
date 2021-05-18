@@ -664,7 +664,7 @@ static inline void release_Recv_mutex() {
 			memcpy(&arr, item->data, sizeof(arr));\
 \
 			*number = arr.length;\
-			memcpy(output, &arr.ptr, sizeof(*output));\
+			*output = arr.ptr;\
 \
 			if (prev_item != NULL) {\
 				prev_item->pNextItem = item->pNextItem;\
@@ -836,7 +836,7 @@ void Get_BFI_Data(BFI_Data* pBFI_Data, int Cha_Num) {
 
 	memcpy(arr->ptr, pBFI_Data, dataSize);
 
-	data->data = &arr;
+	data->data = arr;
 
 	Enqueue_Recv_FIFO(data);
 }
