@@ -16,6 +16,9 @@ static Transmission_Data_Type* pTrans_FIFO_Head = NULL;
 // Pointer to the transmission FIFO tail
 static Transmission_Data_Type* pTrans_FIFO_Tail = NULL;
 
+static Received_Data_Item* pRecv_Data_FIFO_Head = NULL;
+static Received_Data_Item* pRecv_Data_FIFO_Tail = NULL;
+
 //Handle of the COM task thread.
 static HANDLE threadHandle;
 //Handle of the mutex for destroying the COM task.
@@ -23,8 +26,14 @@ static HANDLE hRunMutex;
 //Handle of the mutex for adding to the FIFO queue.
 static HANDLE hFIFOMutex;
 
+static HANDLE hRecvDataMutex;
+static inline void set_Recv_mutex();
+static inline void release_Recv_mutex();
+
 //Removes the first item in the FIFO and returns its pointer.
 static Transmission_Data_Type* Dequeue_Trans_FIFO(void);
+
+int Enqueue_Recv_FIFO(Received_Data_Item* pTransmission);
 
 //Work done by the COM task thread.
 static void COM_Task(void* address);
@@ -49,6 +58,8 @@ static int process_recv(char* buff, unsigned __int32 buffLen);
 
 //Callbacks to call when the host receives data from the DCS.
 static Receive_Callbacks callbacks;
+//Whether the received data should be stored on the heap to be manually emptied.
+static bool should_store;
 //Handle of the mutex for controlling addition to the [callbacks] struct.
 static HANDLE hCallbacksMutex;
 
@@ -57,15 +68,20 @@ static int init_Callback_mutex(void);
 //Releases the handle for hCallbacksMutex.
 static int close_Callback_mutex(void);
 //Thread-safe method of setting the callbacks variable.
-static void set_Callbacks(Receive_Callbacks local_callbacks);
+static void set_Callbacks(Receive_Callbacks local_callbacks, bool local_should_store);
 //Thread-safe method of retrieving the callbacks variable.
-static Receive_Callbacks get_Callbacks();
+static void get_Callbacks(Receive_Callbacks* local_callbacks, bool* local_should_store);
 
-__declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks) {
+//Initializes the handle for hRecvDataMutex.
+static int init_Recv_mutex(void);
+//Releases the handle for hRecvDataMutex.
+static int close_Recv_mutex(void);
+
+__declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks, bool should_store) {
 	//Set the callback functions for receiving data whether the COM task exists or not.
 	//If the callbacks mutex isn't NULL, the COM task is already running so use the thread-safe callback setter.
 	if (hCallbacksMutex != NULL) {
-		set_Callbacks(local_callbacks);
+		set_Callbacks(local_callbacks, should_store);
 	}
 	//Otherwise, the thread-safe callback setter cannot be used and it's safe to set it directly.
 	else {
@@ -98,12 +114,22 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 		return result;
 	}
 
+	result = init_Recv_mutex();
+	if (result != NO_DCS_ERROR) {
+		CloseHandle(hRunMutex);
+		hRunMutex = NULL;
+		close_FIFO_mutex();
+		close_Callback_mutex();
+		return result;
+	}
+
 	DCS_Address* thread_address = malloc(sizeof(*thread_address));
 	if (thread_address == NULL) {
 		CloseHandle(hRunMutex);
 		hRunMutex = NULL;
 		close_FIFO_mutex();
 		close_Callback_mutex();
+		close_Recv_mutex();
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
@@ -116,6 +142,7 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 		hRunMutex = NULL;
 		close_FIFO_mutex();
 		close_Callback_mutex();
+		close_Recv_mutex();
 		free(thread_address);
 		threadHandle = NULL;
 		return THREAD_START_ERROR;
@@ -139,7 +166,7 @@ __declspec(dllexport) int Destroy_COM_Task() {
 
 		//Close other mutexes.
 		close_FIFO_mutex();
-		close_Callback_mutex();
+		close_Recv_mutex();
 
 		//Deference threads to indicate they don't exist.
 		threadHandle = NULL;
@@ -257,6 +284,7 @@ static int recv_data(SOCKET ConnectSocket) {
 //and then continuously sends and receives data until Destroy_COM_Task is called.
 static void COM_Task(void* address) {
 	DCS_Address* dcs_address = (DCS_Address*)address;
+	//printf("%s", dcs_address->address);
 
 	WSADATA wsaData;
 	SOCKET ConnectSocket = INVALID_SOCKET;
@@ -593,9 +621,66 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 	return err;
 }
 
-////////////////
-//Callbacks/////
-////////////////
+int Enqueue_Recv_FIFO(Received_Data_Item* pRecv) {
+	pRecv->pNextItem = NULL;
+
+	set_Recv_mutex();
+
+	//If FIFO is empty, this element is both the head and tail.
+	if (pRecv_Data_FIFO_Head == NULL) {
+		pRecv_Data_FIFO_Head = pRecv;
+		pRecv_Data_FIFO_Tail = pRecv;
+	}
+	//Otherwise, add to the end of FIFO.
+	else {
+		pRecv_Data_FIFO_Tail->pNextItem = pRecv;
+		pRecv_Data_FIFO_Tail = pRecv;
+	}
+
+	release_Recv_mutex();
+
+	return NO_DCS_ERROR;
+}
+
+static int init_Recv_mutex() {
+	if (hRecvDataMutex != NULL) {
+		return THREAD_ALREADY_EXISTS;
+	}
+
+	hRecvDataMutex = CreateMutexW(NULL, false, NULL);
+	if (hRecvDataMutex == NULL) {
+		return THREAD_START_ERROR;
+	}
+	return NO_DCS_ERROR;
+}
+
+static int close_Recv_mutex() {
+	if (hRecvDataMutex == NULL) {
+		return NO_DCS_ERROR;
+	}
+
+	int result = CloseHandle(hRecvDataMutex);
+
+	hRecvDataMutex = NULL;
+
+	return result;
+}
+
+static inline void set_Recv_mutex() {
+	if (hRecvDataMutex == NULL) {
+		return;
+	}
+
+	WaitForSingleObject(hRecvDataMutex, INFINITE);
+}
+
+static inline void release_Recv_mutex() {
+	if (hRecvDataMutex == NULL) {
+		return;
+	}
+
+	ReleaseMutex(hRecvDataMutex);
+}
 
 static int init_Callback_mutex() {
 	if (hCallbacksMutex != NULL) {
@@ -621,73 +706,311 @@ static int close_Callback_mutex() {
 	return result;
 }
 
-static void set_Callbacks(Receive_Callbacks local_callbacks) {
+static void set_Callbacks(Receive_Callbacks local_callbacks, bool local_should_store) {
 	WaitForSingleObject(hCallbacksMutex, INFINITE);
 	callbacks = local_callbacks;
+	should_store = local_should_store;
 	ReleaseMutex(hCallbacksMutex);
 }
 
-static Receive_Callbacks get_Callbacks() {
+static void get_Callbacks(Receive_Callbacks* local_callbacks, bool* local_should_store) {
 	WaitForSingleObject(hCallbacksMutex, INFINITE);
-	Receive_Callbacks local_callbacks = callbacks;
+	*local_callbacks = callbacks;
+	*local_should_store = should_store;
 	ReleaseMutex(hCallbacksMutex);
-
-	return local_callbacks;
 }
 
 //Each of the following functions are internallly called callbacks. They will call the
 //user-defined callback it was passed in Initialize_COM_Task.
 
+#define GETTER_FUNCTION(arg) __declspec(dllexport) int Get_##arg##_Data(arg ## * output) {\
+	set_Recv_mutex();\
+	Received_Data_Item* item = pRecv_Data_FIFO_Head;\
+	Received_Data_Item* prev_item = NULL;\
+	while (item != NULL) {\
+		if (item->data_type == arg ## _Type) {\
+			memcpy(output, item->data, sizeof(*output));\
+\
+			if (prev_item != NULL) {\
+				prev_item->pNextItem = item->pNextItem;\
+				if (prev_item->pNextItem == NULL) {\
+					pRecv_Data_FIFO_Tail = prev_item;\
+				}\
+			}\
+			else {\
+				pRecv_Data_FIFO_Head = item->pNextItem;\
+				if (pRecv_Data_FIFO_Head == NULL) {\
+					pRecv_Data_FIFO_Tail = NULL;\
+				}\
+			}\
+\
+			release_Recv_mutex();\
+\
+			free(item->data);\
+			free(item);\
+			return NO_DCS_ERROR;\
+		}\
+\
+		prev_item = item;\
+		item = item->pNextItem;\
+	}\
+	release_Recv_mutex();\
+	return 1;\
+}
+
+#define ARRAY_GETTER_FUNCTION(arg) __declspec(dllexport) int Get_##arg##_Data(arg ## ** output, int* number) {\
+	set_Recv_mutex();\
+	Received_Data_Item* item = pRecv_Data_FIFO_Head;\
+	Received_Data_Item* prev_item = NULL;\
+	while (item != NULL) {\
+		if (item->data_type == arg ## _Type) {\
+			Array_Data arr = { 0 };\
+			memcpy(&arr, item->data, sizeof(arr));\
+\
+			*number = arr.length;\
+			*output = arr.ptr;\
+\
+			if (prev_item != NULL) {\
+				prev_item->pNextItem = item->pNextItem;\
+				if (prev_item->pNextItem == NULL) {\
+					pRecv_Data_FIFO_Tail = prev_item;\
+				}\
+			}\
+			else {\
+				pRecv_Data_FIFO_Head = item->pNextItem;\
+				if (pRecv_Data_FIFO_Head == NULL) {\
+					pRecv_Data_FIFO_Tail = NULL;\
+				}\
+			}\
+\
+			release_Recv_mutex();\
+\
+			free(item->data);\
+			free(item);\
+			return NO_DCS_ERROR;\
+		}\
+\
+		prev_item = item;\
+		item = item->pNextItem;\
+	}\
+	release_Recv_mutex();\
+	return 1;\
+}
+
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
-	Receive_Callbacks local_callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
 
 	if (local_callbacks.Get_DCS_Status_CB != NULL) {
 		local_callbacks.Get_DCS_Status_CB(bCorr, bAnalyzer, DCS_Cha_Num);
 	}
+
+	if (should_store) {
+		DCS_Status status = {
+			.bCorr = bCorr,
+			.bAnalyzer = bAnalyzer,
+			.DCS_Cha_Num = DCS_Cha_Num
+		};
+
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = DCS_Status_Type;
+		data->data = malloc(sizeof(status));
+		if (data->data == NULL) {
+			free(data);
+			return;
+		}
+
+		memcpy(data->data, &status, sizeof(status));
+
+		Enqueue_Recv_FIFO(data);
+	}
 }
 
-void Get_Correlator_Setting_CB(Correlator_Setting_Type* pCorrelator_Setting) {
-	Receive_Callbacks local_callbacks = get_Callbacks();
+GETTER_FUNCTION(DCS_Status)
+
+void Get_Correlator_Setting_CB(Correlator_Setting* pCorrelator_Setting) {
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
 
 	if (local_callbacks.Get_Correlator_Setting_CB != NULL) {
 		local_callbacks.Get_Correlator_Setting_CB(pCorrelator_Setting);
 	}
+
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Correlator_Setting_Type;
+		data->data = malloc(sizeof(*pCorrelator_Setting));
+		if (data->data == NULL) {
+			free(data);
+			return;
+		}
+
+		memcpy(data->data, pCorrelator_Setting, sizeof(*pCorrelator_Setting));
+
+		Enqueue_Recv_FIFO(data);
+	}
 }
 
-void Get_Analyzer_Setting_CB(Analyzer_Setting_Type* pAnalyzer_Setting, int Cha_Num) {
-	Receive_Callbacks local_callbacks = get_Callbacks();
+GETTER_FUNCTION(Correlator_Setting)
+
+void Get_Analyzer_Setting_CB(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num) {
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
 
 	if (local_callbacks.Get_Analyzer_Setting_CB != NULL) {
 		local_callbacks.Get_Analyzer_Setting_CB(pAnalyzer_Setting, Cha_Num);
 	}
+
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Analyzer_Setting_Type;
+		Array_Data* arr = malloc(sizeof(*arr));
+		if (arr == NULL) {
+			free(data);
+			return;
+		}
+
+		arr->length = Cha_Num;
+
+		const size_t dataSize = sizeof(*pAnalyzer_Setting) * Cha_Num;
+		arr->ptr = malloc(dataSize);
+		if (arr->ptr == NULL) {
+			free(data);
+			free(arr);
+			return;
+		}
+
+		memcpy(arr->ptr, pAnalyzer_Setting, dataSize);
+
+		data->data = arr;
+
+		Enqueue_Recv_FIFO(data);
+	}
 }
 
-void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param_Type* pAnalyzer_Prefit) {
-	Receive_Callbacks local_callbacks = get_Callbacks();
+ARRAY_GETTER_FUNCTION(Analyzer_Setting)
+
+void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param* pAnalyzer_Prefit) {
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
 
 	if (local_callbacks.Get_Analyzer_Prefit_Param_CB != NULL) {
 		local_callbacks.Get_Analyzer_Prefit_Param_CB(pAnalyzer_Prefit);
 	}
+
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Analyzer_Prefit_Param_Type;
+		data->data = malloc(sizeof(*pAnalyzer_Prefit));
+		if (data->data == NULL) {
+			free(data);
+			return;
+		}
+
+		memcpy(data->data, pAnalyzer_Prefit, sizeof(*pAnalyzer_Prefit));
+
+		Enqueue_Recv_FIFO(data);
+	}
 }
 
-void Get_Simulated_Correlation_CB(Simulated_Corr_Type* Simulated_Corr) {
-	Receive_Callbacks local_callbacks = get_Callbacks();
+GETTER_FUNCTION(Analyzer_Prefit_Param)
+
+void Get_Simulated_Correlation_CB(Simulated_Correlation* Simulated_Corr) {
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
 
 	if (local_callbacks.Get_Simulated_Correlation_CB != NULL) {
 		local_callbacks.Get_Simulated_Correlation_CB(Simulated_Corr);
 	}
+
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Simulated_Correlation_Type;
+		data->data = malloc(sizeof(*Simulated_Corr));
+		if (data->data == NULL) {
+			free(data);
+			return;
+		}
+
+		memcpy(data->data, Simulated_Corr, sizeof(*Simulated_Corr));
+
+		Enqueue_Recv_FIFO(data);
+	}
 }
 
-void Get_BFI_Data(BFI_Data_Type* pBFI_Data, int Cha_Num) {
-	Receive_Callbacks local_callbacks = get_Callbacks();
+GETTER_FUNCTION(Simulated_Correlation)
+
+void Get_BFI_Data(BFI_Data* pBFI_Data, int Cha_Num) {
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
 
 	if (local_callbacks.Get_BFI_Data != NULL) {
 		local_callbacks.Get_BFI_Data(pBFI_Data, Cha_Num);
 	}
+
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = BFI_Data_Type;
+		Array_Data* arr = malloc(sizeof(*arr));
+		if (arr == NULL) {
+			free(data);
+			return;
+		}
+
+		arr->length = Cha_Num;
+
+		const size_t dataSize = sizeof(*pBFI_Data) * Cha_Num;
+		arr->ptr = malloc(dataSize);
+		if (arr->ptr == NULL) {
+			free(data);
+			free(arr);
+			return;
+		}
+
+		memcpy(arr->ptr, pBFI_Data, dataSize);
+
+		data->data = arr;
+
+		Enqueue_Recv_FIFO(data);
+	}
 }
 
+ARRAY_GETTER_FUNCTION(BFI_Data)
+
 void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
-	Receive_Callbacks local_callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
 
 	if (local_callbacks.Get_Error_Message_CB != NULL) {
 		local_callbacks.Get_Error_Message_CB(pMessage, Size);
@@ -695,15 +1018,19 @@ void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
 }
 
 void Get_BFI_Corr_Ready_CB(bool bReady) {
-	Receive_Callbacks local_callbacks = get_Callbacks();
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
 
 	if (local_callbacks.Get_BFI_Corr_Ready_CB != NULL) {
 		local_callbacks.Get_BFI_Corr_Ready_CB(bReady);
 	}
 }
 
-void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data_Type* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num) {
-	Receive_Callbacks local_callbacks = get_Callbacks();
+void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num) {
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
 
 	if (local_callbacks.Get_Corr_Intensity_Data_CB != NULL) {
 		local_callbacks.Get_Corr_Intensity_Data_CB(pCorr_Intensity_Data, Cha_Num, pDelayBuf, Delay_Num);
