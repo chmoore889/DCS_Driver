@@ -77,15 +77,16 @@ static int init_Recv_mutex(void);
 //Releases the handle for hRecvDataMutex.
 static int close_Recv_mutex(void);
 
-__declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks, bool should_store) {
+__declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks, bool local_should_store) {
 	//Set the callback functions for receiving data whether the COM task exists or not.
 	//If the callbacks mutex isn't NULL, the COM task is already running so use the thread-safe callback setter.
 	if (hCallbacksMutex != NULL) {
-		set_Callbacks(local_callbacks, should_store);
+		set_Callbacks(local_callbacks, local_should_store);
 	}
 	//Otherwise, the thread-safe callback setter cannot be used and it's safe to set it directly.
 	else {
 		callbacks = local_callbacks;
+		should_store = local_should_store;
 	}
 
 	//Return if a COM task already exists.
