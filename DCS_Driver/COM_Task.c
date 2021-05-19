@@ -689,8 +689,6 @@ static void get_Callbacks(Receive_Callbacks* local_callbacks, bool* local_should
 	*local_callbacks = callbacks;
 	*local_should_store = should_store;
 	ReleaseMutex(hCallbacksMutex);
-
-	return local_callbacks;
 }
 
 //Each of the following functions are internallly called callbacks. They will call the
