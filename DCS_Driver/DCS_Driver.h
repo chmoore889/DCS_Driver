@@ -157,8 +157,10 @@ typedef struct {
 /// </param>
 /// <param name="local_callbacks">Structure of callbacks for the COM task
 /// to call when data is received.</param>
+/// <param name="should_store">If true, stores data on heap to be manually retrieved by getter functions.
+/// If these getters are not called, data will persist.</param>
 /// <returns>Standard DCS status code.</returns>
-DCS_DRIVER_API int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks);
+DCS_DRIVER_API int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks, bool should_store);
 
 /// <summary>
 /// Destroys an already created COM task. Should be called when no more data is to be sent or received.

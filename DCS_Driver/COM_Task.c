@@ -815,21 +815,23 @@ void Get_Correlator_Setting_CB(Correlator_Setting* pCorrelator_Setting) {
 		local_callbacks.Get_Correlator_Setting_CB(pCorrelator_Setting);
 	}
 
-	Received_Data_Item* data = malloc(sizeof(*data));
-	if (data == NULL) {
-		return;
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Correlator_Setting_Type;
+		data->data = malloc(sizeof(*pCorrelator_Setting));
+		if (data->data == NULL) {
+			free(data);
+			return;
+		}
+
+		memcpy(data->data, pCorrelator_Setting, sizeof(*pCorrelator_Setting));
+
+		Enqueue_Recv_FIFO(data);
 	}
-
-	data->data_type = Correlator_Setting_Type;
-	data->data = malloc(sizeof(*pCorrelator_Setting));
-	if (data->data == NULL) {
-		free(data);
-		return;
-	}
-
-	memcpy(data->data, pCorrelator_Setting, sizeof(*pCorrelator_Setting));
-
-	Enqueue_Recv_FIFO(data);
 }
 
 GETTER_FUNCTION(Correlator_Setting)
@@ -843,33 +845,35 @@ void Get_Analyzer_Setting_CB(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num) {
 		local_callbacks.Get_Analyzer_Setting_CB(pAnalyzer_Setting, Cha_Num);
 	}
 
-	Received_Data_Item* data = malloc(sizeof(*data));
-	if (data == NULL) {
-		return;
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Analyzer_Setting_Type;
+		Array_Data* arr = malloc(sizeof(*arr));
+		if (arr == NULL) {
+			free(data);
+			return;
+		}
+
+		arr->length = Cha_Num;
+
+		const size_t dataSize = sizeof(*pAnalyzer_Setting) * Cha_Num;
+		arr->ptr = malloc(dataSize);
+		if (arr->ptr == NULL) {
+			free(data);
+			free(arr);
+			return;
+		}
+
+		memcpy(arr->ptr, pAnalyzer_Setting, dataSize);
+
+		data->data = arr;
+
+		Enqueue_Recv_FIFO(data);
 	}
-
-	data->data_type = Analyzer_Setting_Type;
-	Array_Data* arr = malloc(sizeof(*arr));
-	if (arr == NULL) {
-		free(data);
-		return;
-	}
-
-	arr->length = Cha_Num;
-
-	const size_t dataSize = sizeof(*pAnalyzer_Setting) * Cha_Num;
-	arr->ptr = malloc(dataSize);
-	if (arr->ptr == NULL) {
-		free(data);
-		free(arr);
-		return;
-	}
-
-	memcpy(arr->ptr, pAnalyzer_Setting, dataSize);
-
-	data->data = arr;
-
-	Enqueue_Recv_FIFO(data);
 }
 
 ARRAY_GETTER_FUNCTION(Analyzer_Setting)
@@ -883,21 +887,23 @@ void Get_Analyzer_Prefit_Param_CB(Analyzer_Prefit_Param* pAnalyzer_Prefit) {
 		local_callbacks.Get_Analyzer_Prefit_Param_CB(pAnalyzer_Prefit);
 	}
 
-	Received_Data_Item* data = malloc(sizeof(*data));
-	if (data == NULL) {
-		return;
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Analyzer_Prefit_Param_Type;
+		data->data = malloc(sizeof(*pAnalyzer_Prefit));
+		if (data->data == NULL) {
+			free(data);
+			return;
+		}
+
+		memcpy(data->data, pAnalyzer_Prefit, sizeof(*pAnalyzer_Prefit));
+
+		Enqueue_Recv_FIFO(data);
 	}
-
-	data->data_type = Analyzer_Prefit_Param_Type;
-	data->data = malloc(sizeof(*pAnalyzer_Prefit));
-	if (data->data == NULL) {
-		free(data);
-		return;
-	}
-
-	memcpy(data->data, pAnalyzer_Prefit, sizeof(*pAnalyzer_Prefit));
-
-	Enqueue_Recv_FIFO(data);
 }
 
 GETTER_FUNCTION(Analyzer_Prefit_Param)
@@ -911,21 +917,23 @@ void Get_Simulated_Correlation_CB(Simulated_Correlation* Simulated_Corr) {
 		local_callbacks.Get_Simulated_Correlation_CB(Simulated_Corr);
 	}
 
-	Received_Data_Item* data = malloc(sizeof(*data));
-	if (data == NULL) {
-		return;
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Simulated_Correlation_Type;
+		data->data = malloc(sizeof(*Simulated_Corr));
+		if (data->data == NULL) {
+			free(data);
+			return;
+		}
+
+		memcpy(data->data, Simulated_Corr, sizeof(*Simulated_Corr));
+
+		Enqueue_Recv_FIFO(data);
 	}
-
-	data->data_type = Simulated_Correlation_Type;
-	data->data = malloc(sizeof(*Simulated_Corr));
-	if (data->data == NULL) {
-		free(data);
-		return;
-	}
-
-	memcpy(data->data, Simulated_Corr, sizeof(*Simulated_Corr));
-
-	Enqueue_Recv_FIFO(data);
 }
 
 GETTER_FUNCTION(Simulated_Correlation)
@@ -939,33 +947,35 @@ void Get_BFI_Data(BFI_Data* pBFI_Data, int Cha_Num) {
 		local_callbacks.Get_BFI_Data(pBFI_Data, Cha_Num);
 	}
 
-	Received_Data_Item* data = malloc(sizeof(*data));
-	if (data == NULL) {
-		return;
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = BFI_Data_Type;
+		Array_Data* arr = malloc(sizeof(*arr));
+		if (arr == NULL) {
+			free(data);
+			return;
+		}
+
+		arr->length = Cha_Num;
+
+		const size_t dataSize = sizeof(*pBFI_Data) * Cha_Num;
+		arr->ptr = malloc(dataSize);
+		if (arr->ptr == NULL) {
+			free(data);
+			free(arr);
+			return;
+		}
+
+		memcpy(arr->ptr, pBFI_Data, dataSize);
+
+		data->data = arr;
+
+		Enqueue_Recv_FIFO(data);
 	}
-
-	data->data_type = BFI_Data_Type;
-	Array_Data* arr = malloc(sizeof(*arr));
-	if (arr == NULL) {
-		free(data);
-		return;
-	}
-
-	arr->length = Cha_Num;
-
-	const size_t dataSize = sizeof(*pBFI_Data) * Cha_Num;
-	arr->ptr = malloc(dataSize);
-	if (arr->ptr == NULL) {
-		free(data);
-		free(arr);
-		return;
-	}
-
-	memcpy(arr->ptr, pBFI_Data, dataSize);
-
-	data->data = arr;
-
-	Enqueue_Recv_FIFO(data);
 }
 
 ARRAY_GETTER_FUNCTION(BFI_Data)
