@@ -8,7 +8,7 @@
 #include "Internal.h"
 #include "COM_Task.h"
 
-int Send_Get_DSC_Status(void) {
+int Send_Get_DCS_Status(void) {
 	return Send_DCS_Command(GET_DCS_STATUS, NULL, 0);
 }
 
@@ -348,7 +348,7 @@ int Send_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-#pragma warning (disable: 6386)
+#pragma warning (disable: 6385 6386)
 	unsigned __int32 network_Cha_Num = htool(Cha_Num);
 	memcpy(&pDataBuf[index], &network_Cha_Num, sizeof(network_Cha_Num));
 	index += sizeof(network_Cha_Num);
@@ -369,7 +369,7 @@ int Send_Optical_Param(Optical_Param_Type* pOpt_Param, int Cha_Num) {
 	memcpy(&pDataBuf[index], pOpt_Param_Out, Cha_Num * sizeof(*pOpt_Param_Out));
 	index += Cha_Num * sizeof(*pOpt_Param_Out);
 	free(pOpt_Param_Out);
-#pragma warning (default: 6386)
+#pragma warning (default: 6385 6386)
 
 	int result = Send_DCS_Command(SET_OPTICAL_PARAM, pDataBuf, BufferSize);
 
@@ -531,6 +531,7 @@ int Receive_Corr_Intensity_Data(char* pDataBuf) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
+#pragma warning (disable: 6386 6385 6001)
 	//Read correlation data for each channel.
 	for (unsigned __int32 x = 0; x < numChannels; x++) {
 		//Read the Cha_ID.
@@ -600,6 +601,8 @@ int Receive_Corr_Intensity_Data(char* pDataBuf) {
 	}
 	free(pCorr_Intensity_Data);
 	free(pDelayBuf);
+
+#pragma warning (default: 6386 6385 6001)
 
 	return NO_DCS_ERROR;
 }

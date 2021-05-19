@@ -2,7 +2,7 @@
 #include "Internal.h"
 
 __declspec(dllexport) int Get_DCS_Status(void) {
-	return Send_Get_DSC_Status();
+	return Send_Get_DCS_Status();
 }
 
 __declspec(dllexport) int Set_Correlator_Setting(Correlator_Setting* pCorr_Setting) {

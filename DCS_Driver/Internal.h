@@ -109,7 +109,7 @@ typedef struct Transmission_Data_Type {
 //This function is called by the function Get_DCS_Status. It calls the function
 //Send_DCS_Command to send the “Get DCS Status” command to the DCS. The Status data will
 //be received by the function Receive_DCS_Status.
-int Send_Get_DSC_Status(void);
+int Send_Get_DCS_Status(void);
 int Receive_DCS_Status(char* pDataBuf);
 
 //Sends command to set the passed correlator settings.

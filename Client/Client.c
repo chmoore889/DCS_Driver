@@ -136,7 +136,7 @@ int main(void) {
 		.Get_BFI_Corr_Ready_CB = Get_BFI_Corr_Ready_CB,
 		.Get_Corr_Intensity_Data_CB = Get_Corr_Intensity_Data_CB,
 	};
-	result = Initialize_COM_Task(address);
+	result = Initialize_COM_Task(address, callbacks, false);
 	if (result != NO_DCS_ERROR) {
 		return result;
 	}
@@ -223,9 +223,13 @@ int main(void) {
 #endif // 11
 
 	//Sleep to give time for COM task to receive data and call callbacks.
-	Sleep(30000);
+	Sleep(2000);
 
 	BFI_Data** status = calloc(sizeof *status, 1);
+	if (status == NULL) {
+		Destroy_COM_Task();
+		return MEMORY_ALLOCATION_ERROR;
+	}
 
 	while (1) {
 		int num = 0;
