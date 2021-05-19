@@ -153,6 +153,25 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 }
 
 __declspec(dllexport) int Destroy_COM_Task() {
+	//Clear out received data list
+	set_Recv_mutex();
+	Received_Data_Item* item = pRecv_Data_FIFO_Head;
+	while (item != NULL) {
+		if (item->data_type > After_This_Are_Arrays) {
+			Array_Data array_data = { 0 };
+			memcpy(&array_data, item->data, sizeof(array_data));
+
+			free(array_data.ptr);
+		}
+
+		Received_Data_Item* tmp_item = item;
+		item = item->pNextItem;
+
+		free(tmp_item->data);
+		free(tmp_item);
+	}
+	release_Recv_mutex();
+
 	//If the COM task isn't already stopped, free all the task's resources.
 	if (hRunMutex != NULL) {
 		//Release the run mutex to stop the thread.
@@ -167,12 +186,14 @@ __declspec(dllexport) int Destroy_COM_Task() {
 
 		//Close other mutexes.
 		close_FIFO_mutex();
+		close_Callback_mutex();
 		close_Recv_mutex();
 
 		//Deference threads to indicate they don't exist.
 		threadHandle = NULL;
 		hRunMutex = NULL;
 	}
+
 	return NO_DCS_ERROR;
 }
 

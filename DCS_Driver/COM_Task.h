@@ -44,11 +44,12 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int C
 typedef enum {
 	DCS_Status_Type,
 	Correlator_Setting_Type,
-	Analyzer_Setting_Type,
 	Analyzer_Prefit_Param_Type,
 	Simulated_Correlation_Type,
-	BFI_Data_Type,
 	Corr_Intensity_Data_Type,
+	After_This_Are_Arrays,//Items after/greater than this one use `Array_Data` as their `data`.
+	Analyzer_Setting_Type,
+	BFI_Data_Type,
 } Data_Item_Type;
 
 typedef struct Received_Data_Item {
