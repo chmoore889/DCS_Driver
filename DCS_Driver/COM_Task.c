@@ -77,6 +77,11 @@ static int init_Recv_mutex(void);
 //Releases the handle for hRecvDataMutex.
 static int close_Recv_mutex(void);
 
+//Clears out data from the recv FIFO.
+static void clear_Recv_FIFO(void);
+//Clears out data from the trans FIFO.
+static void clear_Trans_FIFO(void);
+
 __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks, bool local_should_store) {
 	//Set the callback functions for receiving data whether the COM task exists or not.
 	//If the callbacks mutex isn't NULL, the COM task is already running so use the thread-safe callback setter.
@@ -208,24 +213,9 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 }
 
 __declspec(dllexport) int Destroy_COM_Task() {
-	//Clear out received data list
-	set_Recv_mutex();
-	Received_Data_Item* item = pRecv_Data_FIFO_Head;
-	while (item != NULL) {
-		if (item->data_type > After_This_Are_Arrays) {
-			Array_Data array_data = { 0 };
-			memcpy(&array_data, item->data, sizeof(array_data));
+	clear_Recv_FIFO();
 
-			free(array_data.ptr);
-		}
-
-		Received_Data_Item* tmp_item = item;
-		item = item->pNextItem;
-
-		free(tmp_item->data);
-		free(tmp_item);
-	}
-	release_Recv_mutex();
+	clear_Trans_FIFO();
 
 	//If the COM task isn't already stopped, free all the task's resources.
 	if (hRunMutex != NULL) {
@@ -721,6 +711,43 @@ static void get_Callbacks(Receive_Callbacks* local_callbacks, bool* local_should
 	*local_callbacks = callbacks;
 	*local_should_store = should_store;
 	ReleaseMutex(hCallbacksMutex);
+}
+
+static void clear_Recv_FIFO(void) {
+	set_Recv_mutex();
+	Received_Data_Item* item = pRecv_Data_FIFO_Head;
+	while (item != NULL) {
+		if (item->data_type > After_This_Are_Arrays) {
+			Array_Data array_data = { 0 };
+			memcpy(&array_data, item->data, sizeof(array_data));
+
+			free(array_data.ptr);
+		}
+
+		Received_Data_Item* tmp_item = item;
+		item = item->pNextItem;
+
+		free(tmp_item->data);
+		free(tmp_item);
+	}
+	pRecv_Data_FIFO_Head = NULL;
+	pRecv_Data_FIFO_Tail = NULL;
+	release_Recv_mutex();
+}
+
+static void clear_Trans_FIFO(void) {
+	set_FIFO_mutex();
+	Transmission_Data_Type* trans_data = pTrans_FIFO_Head;
+	while (trans_data != NULL) {
+		Transmission_Data_Type* tmp_item = trans_data;
+		trans_data = trans_data->pNextItem;
+
+		free(tmp_item->pFrame);
+		free(tmp_item);
+	}
+	pTrans_FIFO_Head = NULL;
+	pTrans_FIFO_Tail = NULL;
+	release_FIFO_mutex();
 }
 
 //Each of the following functions are internallly called callbacks. They will call the
