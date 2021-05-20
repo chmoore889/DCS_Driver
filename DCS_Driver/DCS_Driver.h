@@ -20,6 +20,7 @@
 //COM Task - Thread Error Codes
 #define THREAD_START_ERROR -7
 #define THREAD_ALREADY_EXISTS -8
+#define NETWORK_INIT_ERROR -9
 
 typedef struct {
 	int Data_N; //data number for correlation computation

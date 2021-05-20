@@ -136,7 +136,7 @@ int main(void) {
 		.Get_BFI_Corr_Ready_CB = Get_BFI_Corr_Ready_CB,
 		.Get_Corr_Intensity_Data_CB = Get_Corr_Intensity_Data_CB,
 	};
-	result = Initialize_COM_Task(address, callbacks, true);
+	result = Initialize_COM_Task(address, callbacks, false);
 	if (result != NO_DCS_ERROR) {
 		return result;
 	}

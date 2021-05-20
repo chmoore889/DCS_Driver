@@ -94,57 +94,112 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 		return THREAD_ALREADY_EXISTS;
 	}
 
+	WSADATA wsaData;
+	SOCKET ConnectSocket = INVALID_SOCKET;
+	struct addrinfo* result = NULL,
+		* ptr = NULL,
+		hints;
+	int iResult;
+
+	//Initialize Winsock
+	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
+	if (iResult != 0) {
+		printf("WSAStartup failed with error: %d\n", iResult);
+		return NETWORK_INIT_ERROR;
+	}
+
+	ZeroMemory(&hints, sizeof(hints));
+	hints.ai_family = AF_INET;
+	hints.ai_socktype = SOCK_STREAM;
+	hints.ai_protocol = IPPROTO_TCP;
+
+	//Resolve the server address and port.
+	iResult = getaddrinfo(address.address, address.port, &hints, &result);
+	if (iResult != 0) {
+		printf("getaddrinfo failed with error: %d\n", iResult);
+		WSACleanup();
+		return NETWORK_INIT_ERROR;
+	}
+
+	//Attempt to connect to an address until one succeeds.
+	for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
+		//Create a SOCKET for connecting to server
+		ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
+		if (ConnectSocket == INVALID_SOCKET) {
+			printf("Socket failed with error: %d\n", WSAGetLastError());
+			WSACleanup();
+			return NETWORK_INIT_ERROR;
+		}
+
+		// Connect to server.
+		iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
+		if (iResult == SOCKET_ERROR) {
+			printf("Connection to server failed - failed with error: %d\n", WSAGetLastError());
+			closesocket(ConnectSocket);
+			ConnectSocket = INVALID_SOCKET;
+			continue;
+		}
+		//printf("connected to server\n");
+		break;
+	}
+
+	freeaddrinfo(result);
+
+	if (ConnectSocket == INVALID_SOCKET) {
+		printf("Unable to connect to server!\n");
+		WSACleanup();
+		return NETWORK_INIT_ERROR;
+	}
+
+	Check_Command_Response(COMMAND_RSP_RESET, 0);
+
+	//Make the socket non-blocking for convenience when receiving data in the COM thread.
+	u_long iMode = 1;
+	iResult = ioctlsocket(ConnectSocket, FIONBIO, &iMode);
+	if (iResult != NO_ERROR) {
+		printf("ioctlsocket failed with error: %ld\n", iResult);
+		WSACleanup();
+		return NETWORK_INIT_ERROR;
+	}
+
 	//Initialize a set mutex for stopping the thread later.
 	hRunMutex = CreateMutexW(NULL, true, NULL);
 	if (hRunMutex == NULL) {
 		return THREAD_START_ERROR;
 	}
 
-	int result = init_FIFO_mutex();
-	if (result != NO_DCS_ERROR) {
+	iResult = init_FIFO_mutex();
+	if (iResult != NO_DCS_ERROR) {
 		CloseHandle(hRunMutex);
 		hRunMutex = NULL;
-		return result;
+		return iResult;
 	}
 
-	result = init_Callback_mutex();
-	if (result != NO_DCS_ERROR) {
-		CloseHandle(hRunMutex);
-		hRunMutex = NULL;
-		close_FIFO_mutex();
-		return result;
-	}
-
-	result = init_Recv_mutex();
-	if (result != NO_DCS_ERROR) {
+	iResult = init_Callback_mutex();
+	if (iResult != NO_DCS_ERROR) {
 		CloseHandle(hRunMutex);
 		hRunMutex = NULL;
 		close_FIFO_mutex();
-		close_Callback_mutex();
-		return result;
+		return iResult;
 	}
 
-	DCS_Address* thread_address = malloc(sizeof(*thread_address));
-	if (thread_address == NULL) {
+	iResult = init_Recv_mutex();
+	if (iResult != NO_DCS_ERROR) {
 		CloseHandle(hRunMutex);
 		hRunMutex = NULL;
 		close_FIFO_mutex();
 		close_Callback_mutex();
-		close_Recv_mutex();
-		return MEMORY_ALLOCATION_ERROR;
+		return iResult;
 	}
-
-	*thread_address = address;
 
 	//Start the COM task thread, calling the COM_Task function.
-	threadHandle = (HANDLE)_beginthread(COM_Task, 0, thread_address);
+	threadHandle = (HANDLE)_beginthread(COM_Task, 0, (void*)ConnectSocket);
 	if (threadHandle == NULL || PtrToLong(threadHandle) == -1L) {
 		CloseHandle(hRunMutex);
 		hRunMutex = NULL;
 		close_FIFO_mutex();
 		close_Callback_mutex();
 		close_Recv_mutex();
-		free(thread_address);
 		threadHandle = NULL;
 		return THREAD_START_ERROR;
 	}
@@ -304,83 +359,9 @@ static int recv_data(SOCKET ConnectSocket) {
 
 //Function run by the COM task thread. Initiates connection to the DCS
 //and then continuously sends and receives data until Destroy_COM_Task is called.
-static void COM_Task(void* address) {
-	DCS_Address* dcs_address = (DCS_Address*)address;
-	//printf("%s", dcs_address->address);
-
-	WSADATA wsaData;
-	SOCKET ConnectSocket = INVALID_SOCKET;
-	struct addrinfo* result = NULL,
-		* ptr = NULL,
-		hints;
-	int iResult;
-
-	//Initialize Winsock
-	iResult = WSAStartup(MAKEWORD(2, 2), &wsaData);
-	if (iResult != 0) {
-		printf("WSAStartup failed with error: %d\n", iResult);
-		free(dcs_address);
-		_endthread();
-		return;
-	}
-
-	ZeroMemory(&hints, sizeof(hints));
-	hints.ai_family = AF_INET;
-	hints.ai_socktype = SOCK_STREAM;
-	hints.ai_protocol = IPPROTO_TCP;
-
-	//Resolve the server address and port.
-	iResult = getaddrinfo(dcs_address->address, dcs_address->port, &hints, &result);
-	free(dcs_address);
-	if (iResult != 0) {
-		printf("getaddrinfo failed with error: %d\n", iResult);
-		WSACleanup();
-		_endthread();
-		return;
-	}
-
-	//Attempt to connect to an address until one succeeds.
-	for (ptr = result; ptr != NULL; ptr = ptr->ai_next) {
-		//Create a SOCKET for connecting to server
-		ConnectSocket = socket(ptr->ai_family, ptr->ai_socktype, ptr->ai_protocol);
-		if (ConnectSocket == INVALID_SOCKET) {
-			printf("Socket failed with error: %d\n", WSAGetLastError());
-			WSACleanup();
-
-			_endthread();
-			return;
-		}
-
-		// Connect to server.
-		iResult = connect(ConnectSocket, ptr->ai_addr, (int)ptr->ai_addrlen);
-		if (iResult == SOCKET_ERROR) {
-			printf("Connection to server failed - failed with error: %d\n", WSAGetLastError());
-			closesocket(ConnectSocket);
-			ConnectSocket = INVALID_SOCKET;
-			continue;
-		}
-		//printf("connected to server\n");
-		break;
-	}
-
-	freeaddrinfo(result);
-
-	if (ConnectSocket == INVALID_SOCKET) {
-		printf("Unable to connect to server!\n");
-		WSACleanup();
-
-		_endthread();
-		return;
-	}
-
-	Check_Command_Response(COMMAND_RSP_RESET, 0);
-
-	//Make the socket non-blocking for convenience when receiving data in the COM thread.
-	u_long iMode = 1;
-	iResult = ioctlsocket(ConnectSocket, FIONBIO, &iMode);
-	if (iResult != NO_ERROR) {
-		printf("ioctlsocket failed with error: %ld\n", iResult);
-	}
+static void COM_Task(void* socket_ptr) {
+	SOCKET ConnectSocket = (SOCKET)socket_ptr;
+	int iResult = 0;
 
 	//Repeat while RunMutex is still taken by the main thread. Clean up and exit when it's released.
 	while (WaitForSingleObject(hRunMutex, 50) == WAIT_TIMEOUT) {
