@@ -48,3 +48,8 @@ __declspec(dllexport) int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param* pAnal
 __declspec(dllexport) int Get_Analyzer_Prefit_Param(void) {
 	return Send_Get_Analyzer_Prefit_Param();
 }
+
+__declspec(dllexport) Receive_Callbacks Null_Receive_Callbacks(void) {
+	Receive_Callbacks callbacks = { 0 };
+	return callbacks;
+}

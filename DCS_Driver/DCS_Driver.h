@@ -260,3 +260,9 @@ DCS_DRIVER_API int Set_Analyzer_Prefit_Param(Analyzer_Prefit_Param* pAnalyzer_Pr
 /// </summary>
 /// <returns>Standard DCS status code.</returns>
 DCS_DRIVER_API int Get_Analyzer_Prefit_Param(void);
+
+/// <summary>
+/// Returns a struct of NULL-initialized callbacks for when they're not used.
+/// </summary>
+/// <returns>NULL-initialized callbacks.</returns>
+DCS_DRIVER_API Receive_Callbacks Null_Receive_Callbacks(void);
