@@ -24,7 +24,7 @@ int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission);
 /// </param>
 /// <param name="Command_Code">The command being set or checked.</param>
 /// <returns>Standard DCS status code.</returns>
-int Check_Command_Response(int Option, int Command_Code);
+int Check_Command_Response(int Option, Data_ID Command_Code);
 
 
 /////////////////////////////////////////////////////////////////

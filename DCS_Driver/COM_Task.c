@@ -156,7 +156,7 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 		return NETWORK_INIT_ERROR;
 	}
 
-	Check_Command_Response(COMMAND_RSP_RESET, 0);
+	//Check_Command_Response(COMMAND_RSP_RESET, 0);
 
 	//Make the socket non-blocking for convenience when receiving data in the COM thread.
 	u_long iMode = 1;
@@ -379,7 +379,7 @@ static void COM_Task(void* socket_ptr) {
 			return;
 		}
 
-		Check_Command_Response(COMMAND_RSP_CHECK, 0);
+		//Check_Command_Response(COMMAND_RSP_CHECK, 0);
 	}
 
 	//Cleanup

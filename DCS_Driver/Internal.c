@@ -465,6 +465,8 @@ int Receive_Command_ACK(char* pDataBuf) {
 	memcpy(&commandId, pDataBuf, sizeof(commandId));
 	printf(ANSI_COLOR_GREEN"Command Ack: 0x%02x\n"ANSI_COLOR_RESET, commandId);
 
+	//Check_Command_Response(COMMAND_RSP_VALIDATE, commandId);
+
 	return NO_DCS_ERROR;
 }
 
@@ -648,7 +650,9 @@ int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const unsigned __int32 Buf
 	//Add checksum calculated from 2(Header) + 4(Type ID) + 4(Data ID) + BufferSize
 	pTransmission->pFrame[pTransmission->size - 1] = compute_checksum(pTransmission->pFrame, pTransmission->size - 1);
 
-	return Enqueue_Trans_FIFO(pTransmission);
+	int result = Enqueue_Trans_FIFO(pTransmission);
+	Check_Command_Response(COMMAND_RSP_SET, data_ID);
+	return result;
 }
 
 Checksum compute_checksum(char* pDataBuf, unsigned __int32 size) {
