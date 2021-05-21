@@ -722,6 +722,7 @@ static void clear_Recv_FIFO(void) {
 	Received_Data_Item* item = pRecv_Data_FIFO_Head;
 	while (item != NULL) {
 		if (item->data_type == Corr_Intensity_Data_Type) {
+#pragma warning (disable: 6001)
 			Array_Data array_data[2] = { 0 };
 			memcpy(array_data, item->data, sizeof(*array_data) * 2);
 
@@ -732,6 +733,7 @@ static void clear_Recv_FIFO(void) {
 
 			free(array_data[0].ptr);
 			free(array_data[1].ptr);
+#pragma warning (default: 6001)
 		}
 		else if (item->data_type > After_This_Are_Arrays) {
 			Array_Data array_data = { 0 };
@@ -1110,19 +1112,20 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int C
 		Corr_Intensity_Data* pCorr_Intensity_Data_Copy = malloc(corrDataSize);
 		if (pCorr_Intensity_Data_Copy == NULL) {
 			free(data);
-			free(arr);
 			free(arr[0].ptr);
+			free(arr);
 			return;
 		}
 		memcpy(pCorr_Intensity_Data_Copy, pCorr_Intensity_Data, corrDataSize);
 
 		for (__int32 x = 0; x < Cha_Num; x++) {
+#pragma warning (disable: 6385 6386)
 			const size_t listSize = sizeof(*(pCorr_Intensity_Data_Copy[x].pCorrBuf)) * pCorr_Intensity_Data_Copy[x].Data_Num;
 			pCorr_Intensity_Data_Copy[x].pCorrBuf = malloc(listSize);
 			if (pCorr_Intensity_Data_Copy[x].pCorrBuf == NULL) {
 				free(data);
-				free(arr);
 				free(arr[0].ptr);
+				free(arr);
 
 				for (__int32 y = 0; y < x; y++) {
 					free(pCorr_Intensity_Data_Copy[y].pCorrBuf);
@@ -1132,6 +1135,7 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int C
 			}
 
 			memcpy(pCorr_Intensity_Data_Copy[x].pCorrBuf, pCorr_Intensity_Data[x].pCorrBuf, listSize);
+#pragma warning (default: 6385 6386)
 		}
 
 		memcpy(arr[0].ptr, pCorr_Intensity_Data_Copy, corrDataSize);
@@ -1140,11 +1144,13 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int C
 		arr[1].ptr = malloc(delayDataSize);
 		if (arr[1].ptr == NULL) {
 			free(data);
-			free(arr);
 			free(arr[0].ptr);
+			free(arr);
 
 			for (__int32 x = 0; x < Cha_Num; x++) {
+#pragma warning (disable: 6001)
 				free(pCorr_Intensity_Data_Copy[x].pCorrBuf);
+#pragma warning (default: 6001)
 			}
 			free(pCorr_Intensity_Data_Copy);
 			return;

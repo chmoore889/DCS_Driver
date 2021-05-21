@@ -260,7 +260,9 @@ int main(void) {
 		Get_Corr_Intensity_Data_CB(*corr, num, *delays, num2);
 		
 		for (int x = 0; x < num; x++) {
+#pragma warning (disable: 6001)
 			free((*corr)[x].pCorrBuf);
+#pragma warning (default: 6001)
 		}
 		free(*corr);
 		free(*delays);
