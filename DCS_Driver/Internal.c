@@ -619,7 +619,7 @@ int Receive_Intensity_Data(char* pDataBuf) {
 	index += sizeof(numChannels);
 
 	//Allocating memory for numChannels channels of data.
-	Intensity_Data_Type* pIntensity_Data = malloc(sizeof(*pIntensity_Data) * numChannels);
+	Intensity_Data* pIntensity_Data = malloc(sizeof(*pIntensity_Data) * numChannels);
 	if (pIntensity_Data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
@@ -641,6 +641,8 @@ int Receive_Intensity_Data(char* pDataBuf) {
 	Get_Intensity_Data_CB(pIntensity_Data, numChannels);
 
 	free(pIntensity_Data);
+
+	return NO_DCS_ERROR;
 }
 
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize) {

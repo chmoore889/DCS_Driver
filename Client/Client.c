@@ -114,7 +114,7 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int C
 	printf("\b\b]\n");
 }
 
-void Get_Intensity_Data_CB(Intensity_Data_Type* pIntensity_Data, int Cha_Num) {
+void Get_Intensity_Data_CB(Intensity_Data* pIntensity_Data, int Cha_Num) {
 	printf("Intensity Data:\n");
 	for (int x = 0; x < Cha_Num; x++) {
 		printf("Channel %d:\n", pIntensity_Data[x].Cha_ID);
@@ -142,10 +142,10 @@ int main(void) {
 		.Get_BFI_Data = Get_BFI_Data,
 		.Get_Error_Message_CB = Get_Error_Message_CB,
 		.Get_BFI_Corr_Ready_CB = Get_BFI_Corr_Ready_CB,
-		.Get_Corr_Intensity_Data_CB = Get_Corr_Intensity_Data_CB,
+		//.Get_Corr_Intensity_Data_CB = Get_Corr_Intensity_Data_CB,
 		.Get_Intensity_Data_CB = Get_Intensity_Data_CB,
 	};
-	result = Initialize_COM_Task(address, callbacks, false);
+	result = Initialize_COM_Task(address, callbacks, true);
 	if (result != NO_DCS_ERROR) {
 		return result;
 	}
@@ -188,7 +188,7 @@ int main(void) {
 #endif // 4
 
 #if FUNC_TO_TEST == 5
-	result = Enable_DCS(false, true);
+	result = Enable_DCS(true, false);
 
 	int ids[] = { 1, 2,};
 	result = Start_DCS_Measurement(5, ids, sizeof(ids) / sizeof(ids[0]));
@@ -232,30 +232,44 @@ int main(void) {
 #endif // 11
 
 	//Sleep to give time for COM task to receive data and call callbacks.
-	Sleep(2000);
+	Sleep(3000);
 
-	BFI_Data** status = calloc(sizeof *status, 1);
-	if (status == NULL) {
+	Corr_Intensity_Data** corr = calloc(sizeof * corr, 1);
+	if (corr == NULL) {
+		Destroy_COM_Task();
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	float** delays = calloc(sizeof * delays, 1);
+	if (delays == NULL) {
+		free(corr);
 		Destroy_COM_Task();
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
 	while (1) {
 		int num = 0;
+		int num2 = 0;
 
-		int res = Get_BFI_Data_Data(status, &num);
+		int res = Get_Corr_Intensity_Data_Data(corr, &num, delays, &num2);
 		//printf("Ret val: %d\n", res);
 		if (res != NO_DCS_ERROR) {
 			break;
 		}
 
-		Get_BFI_Data(*status, num);
-		free(*status);
+		Get_Corr_Intensity_Data_CB(*corr, num, *delays, num2);
+		
+		for (int x = 0; x < num; x++) {
+			free((*corr)[x].pCorrBuf);
+		}
+		free(*corr);
+		free(*delays);
 	}
 
-	free(status);
+	free(corr);
+	free(delays);
 
-	Sleep(2000);
+	//Sleep(2000);
 
 	Destroy_COM_Task();
 	return result;

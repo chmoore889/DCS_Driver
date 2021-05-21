@@ -721,7 +721,19 @@ static void clear_Recv_FIFO(void) {
 	set_Recv_mutex();
 	Received_Data_Item* item = pRecv_Data_FIFO_Head;
 	while (item != NULL) {
-		if (item->data_type > After_This_Are_Arrays) {
+		if (item->data_type == Corr_Intensity_Data_Type) {
+			Array_Data array_data[2] = { 0 };
+			memcpy(&array_data, item->data, sizeof(array_data) * 2);
+
+			Corr_Intensity_Data* data = array_data[0].ptr;
+			for (int x = 0; x < array_data[0].length; x++) {
+				free(data[x].pCorrBuf);
+			}
+
+			free(array_data[0].ptr);
+			free(array_data[1].ptr);
+		}
+		else if (item->data_type > After_This_Are_Arrays) {
 			Array_Data array_data = { 0 };
 			memcpy(&array_data, item->data, sizeof(array_data));
 
@@ -1069,9 +1081,128 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int C
 	if (local_callbacks.Get_Corr_Intensity_Data_CB != NULL) {
 		local_callbacks.Get_Corr_Intensity_Data_CB(pCorr_Intensity_Data, Cha_Num, pDelayBuf, Delay_Num);
 	}
+
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Corr_Intensity_Data_Type;
+		Array_Data* arr = malloc(sizeof(*arr) * 2);
+		if (arr == NULL) {
+			free(data);
+			return;
+		}
+
+		arr[0].length = Cha_Num;
+		arr[1].length = Delay_Num;
+
+		const size_t corrDataSize = sizeof(*pCorr_Intensity_Data) * Cha_Num;
+		arr[0].ptr = malloc(corrDataSize);
+		if (arr[0].ptr == NULL) {
+			free(data);
+			free(arr);
+			return;
+		}
+
+		//Make copy of pCorr_Intensity_Data
+		Corr_Intensity_Data* pCorr_Intensity_Data_Copy = malloc(corrDataSize);
+		if (pCorr_Intensity_Data_Copy == NULL) {
+			free(data);
+			free(arr);
+			free(arr[0].ptr);
+			return;
+		}
+		memcpy(pCorr_Intensity_Data_Copy, pCorr_Intensity_Data, corrDataSize);
+
+		for (__int32 x = 0; x < Cha_Num; x++) {
+			const size_t listSize = sizeof(*(pCorr_Intensity_Data_Copy[x].pCorrBuf)) * pCorr_Intensity_Data_Copy[x].Data_Num;
+			pCorr_Intensity_Data_Copy[x].pCorrBuf = malloc(listSize);
+			if (pCorr_Intensity_Data_Copy[x].pCorrBuf == NULL) {
+				free(data);
+				free(arr);
+				free(arr[0].ptr);
+
+				for (__int32 y = 0; y < x; y++) {
+					free(pCorr_Intensity_Data_Copy[y].pCorrBuf);
+				}
+				free(pCorr_Intensity_Data_Copy);
+				return;
+			}
+
+			memcpy(pCorr_Intensity_Data_Copy[x].pCorrBuf, pCorr_Intensity_Data[x].pCorrBuf, listSize);
+		}
+
+		memcpy(arr[0].ptr, pCorr_Intensity_Data_Copy, corrDataSize);
+
+		const size_t delayDataSize = sizeof(*pDelayBuf) * Delay_Num;
+		arr[1].ptr = malloc(delayDataSize);
+		if (arr[1].ptr == NULL) {
+			free(data);
+			free(arr);
+			free(arr[0].ptr);
+
+			for (__int32 x = 0; x < Cha_Num; x++) {
+				free(pCorr_Intensity_Data_Copy[x].pCorrBuf);
+			}
+			free(pCorr_Intensity_Data_Copy);
+			return;
+		}
+
+		free(pCorr_Intensity_Data_Copy);
+
+		memcpy(arr[1].ptr, pDelayBuf, delayDataSize);
+
+		data->data = arr;
+
+		Enqueue_Recv_FIFO(data);
+	}
 }
 
-void Get_Intensity_Data_CB(Intensity_Data_Type* pIntensity_Data, int Cha_Num) {
+__declspec(dllexport) int Get_Corr_Intensity_Data_Data(Corr_Intensity_Data** output, int* number, float** pDelayBufOutput, int* Delay_Num_Output) {
+	set_Recv_mutex();
+	Received_Data_Item* item = pRecv_Data_FIFO_Head;
+	Received_Data_Item* prev_item = NULL;
+	while (item != NULL) {
+		if (item->data_type == Corr_Intensity_Data_Type) {
+			Array_Data arr[2] = { 0 };
+			memcpy(arr, item->data, sizeof(*arr) * 2);
+
+			*number = arr[0].length;
+			*output = arr[0].ptr;
+
+			*Delay_Num_Output = arr[1].length;
+			*pDelayBufOutput = arr[1].ptr;
+
+			if (prev_item != NULL) {
+				prev_item->pNextItem = item->pNextItem;
+				if (prev_item->pNextItem == NULL) {
+					pRecv_Data_FIFO_Tail = prev_item;
+				}
+			}
+			else {
+				pRecv_Data_FIFO_Head = item->pNextItem;
+				if (pRecv_Data_FIFO_Head == NULL) {
+					pRecv_Data_FIFO_Tail = NULL;
+				}
+			}
+
+			release_Recv_mutex();
+
+			free(item->data);
+			free(item);
+			return NO_DCS_ERROR;
+		}
+
+		prev_item = item;
+		item = item->pNextItem;
+	}
+	release_Recv_mutex();
+	return 1;
+}
+
+void Get_Intensity_Data_CB(Intensity_Data* pIntensity_Data, int Cha_Num) {
 	Receive_Callbacks local_callbacks = { 0 };
 	bool should_store = false;
 	get_Callbacks(&local_callbacks, &should_store);
@@ -1079,4 +1210,36 @@ void Get_Intensity_Data_CB(Intensity_Data_Type* pIntensity_Data, int Cha_Num) {
 	if (local_callbacks.Get_Intensity_Data_CB != NULL) {
 		local_callbacks.Get_Intensity_Data_CB(pIntensity_Data, Cha_Num);
 	}
+
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Intensity_Data_Type;
+		Array_Data* arr = malloc(sizeof(*arr));
+		if (arr == NULL) {
+			free(data);
+			return;
+		}
+
+		arr->length = Cha_Num;
+
+		const size_t dataSize = sizeof(*pIntensity_Data) * Cha_Num;
+		arr->ptr = malloc(dataSize);
+		if (arr->ptr == NULL) {
+			free(data);
+			free(arr);
+			return;
+		}
+
+		memcpy(arr->ptr, pIntensity_Data, dataSize);
+
+		data->data = arr;
+
+		Enqueue_Recv_FIFO(data);
+	}
 }
+
+ARRAY_GETTER_FUNCTION(Intensity_Data)

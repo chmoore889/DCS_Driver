@@ -86,7 +86,7 @@ typedef struct {
 typedef struct {
 	int Cha_ID; //Channel ID
 	float intensity; //intensity of the optical channel
-} Intensity_Data_Type;
+} Intensity_Data;
 
 //Structure for DCS address data.
 typedef struct {
@@ -127,7 +127,7 @@ typedef void(*Get_BFI_Corr_Ready_CB_Def)(bool bReady);
 typedef void(*Get_Corr_Intensity_Data_CB_Def)(Corr_Intensity_Data* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);
 
 //Callback for getting the correlation intensity data.
-typedef void(*Get_Intensity_Data_CB_Def)(Intensity_Data_Type* pIntensity_Data, int Cha_Num);
+typedef void(*Get_Intensity_Data_CB_Def)(Intensity_Data* pIntensity_Data, int Cha_Num);
 
 //Structure to hold all of the callbacks for the COM task to call.
 typedef struct {
