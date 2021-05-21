@@ -442,6 +442,7 @@ int Receive_Error_Message(char* pDataBuf) {
 	//Read 4 byte prepended string size.
 	unsigned __int32 strSize;
 	memcpy(&strSize, pDataBuf, sizeof(strSize));
+	strSize = itohl(strSize);
 
 	//Allocate memory for string.
 	char* pMessage = malloc(strSize);
@@ -451,12 +452,24 @@ int Receive_Error_Message(char* pDataBuf) {
 
 	memcpy(pMessage, &pDataBuf[sizeof(strSize)], strSize);
 
-	printf(ANSI_COLOR_RED);
-	printf("Remote DCS Error!\n");
+	printf(ANSI_COLOR_BLUE);
 	Get_Error_Message_CB(pMessage, strSize);
 	printf(ANSI_COLOR_RESET);
 
 	free(pMessage);
+	return NO_DCS_ERROR;
+}
+
+int Receive_Error_Code(char* pDataBuf) {
+	unsigned __int32 errorType;
+	memcpy(&errorType, pDataBuf, sizeof(errorType));
+	errorType = itohl(errorType);
+
+	printf(ANSI_COLOR_RED);
+	printf("Remote DCS Error!\n");
+	Get_Error_Code_CB(errorType);
+	printf(ANSI_COLOR_RESET);
+
 	return NO_DCS_ERROR;
 }
 

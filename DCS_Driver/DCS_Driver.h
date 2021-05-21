@@ -117,6 +117,8 @@ typedef void(*Get_Analyzer_Prefit_Param_CB_Def)(Analyzer_Prefit_Param* pAnalyzer
 //Callback for error messages that are received
 typedef void(*Get_Error_Message_CB_Def)(char* pMessage, unsigned __int32 Size);
 
+typedef void(*Get_Error_Code_CB_Def)(unsigned __int32 code);
+
 //Callback for getting BFI data.
 typedef void(*Get_BFI_Data_Def)(BFI_Data* pBFI_Data, int Cha_Num);
 
@@ -151,6 +153,8 @@ typedef struct {
 	Get_Corr_Intensity_Data_CB_Def Get_Corr_Intensity_Data_CB;
 	//Callback for getting intensity data.
 	Get_Intensity_Data_CB_Def Get_Intensity_Data_CB;
+	//Callback for getting an error code.
+	Get_Error_Code_CB_Def Get_Error_Code_CB;
 } Receive_Callbacks;
 
 ////////////

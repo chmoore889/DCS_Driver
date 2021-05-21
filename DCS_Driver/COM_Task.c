@@ -608,6 +608,10 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 		err = Receive_Intensity_Data(pDataBuff);
 		break;
 
+	case GET_ERROR_ID:
+		err = Receive_Error_Code(pDataBuff);
+		break;
+
 	default:
 		printf(ANSI_COLOR_RED"Invalid Data ID: 0x%08X\n"ANSI_COLOR_RESET, data_id);
 		err = FRAME_INVALID_DATA;
@@ -1055,13 +1059,55 @@ void Get_BFI_Data(BFI_Data* pBFI_Data, int Cha_Num) {
 
 ARRAY_GETTER_FUNCTION(BFI_Data)
 
-void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size) {
+void Get_Error_Message_CB(Error_Message* pMessage, unsigned __int32 Size) {
 	Receive_Callbacks local_callbacks = { 0 };
 	bool should_store = false;
 	get_Callbacks(&local_callbacks, &should_store);
 
 	if (local_callbacks.Get_Error_Message_CB != NULL) {
 		local_callbacks.Get_Error_Message_CB(pMessage, Size);
+	}
+
+	if (should_store) {
+		Received_Data_Item* data = malloc(sizeof(*data));
+		if (data == NULL) {
+			return;
+		}
+
+		data->data_type = Error_Message_Type;
+		Array_Data* arr = malloc(sizeof(*arr));
+		if (arr == NULL) {
+			free(data);
+			return;
+		}
+
+		arr->length = Size;
+
+		const size_t dataSize = sizeof(*pMessage) * Size;
+		arr->ptr = malloc(dataSize);
+		if (arr->ptr == NULL) {
+			free(data);
+			free(arr);
+			return;
+		}
+
+		memcpy(arr->ptr, pMessage, dataSize);
+
+		data->data = arr;
+
+		Enqueue_Recv_FIFO(data);
+	}
+}
+
+ARRAY_GETTER_FUNCTION(Error_Message)
+
+void Get_Error_Code_CB(unsigned __int32 code) {
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
+
+	if (local_callbacks.Get_Error_Code_CB != NULL) {
+		local_callbacks.Get_Error_Code_CB(code);
 	}
 }
 

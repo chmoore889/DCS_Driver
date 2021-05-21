@@ -14,7 +14,7 @@
 #define HOST_NAME "129.49.117.79"
 
 #define TEST_ARRAY_LEN 6
-#define FUNC_TO_TEST 5
+#define FUNC_TO_TEST 3
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("DCS Status:\n");
@@ -122,6 +122,10 @@ void Get_Intensity_Data_CB(Intensity_Data* pIntensity_Data, int Cha_Num) {
 	}
 }
 
+void Get_Error_Code_CB(unsigned __int32 code) {
+	printf("Error code: %u\n", code);
+}
+
 int main(void) {
 	//Needed to detect and output memory leaks in debug mode.
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -144,6 +148,7 @@ int main(void) {
 		.Get_BFI_Corr_Ready_CB = Get_BFI_Corr_Ready_CB,
 		.Get_Corr_Intensity_Data_CB = Get_Corr_Intensity_Data_CB,
 		.Get_Intensity_Data_CB = Get_Intensity_Data_CB,
+		.Get_Error_Code_CB = Get_Error_Code_CB,
 	};
 	result = Initialize_COM_Task(address, callbacks, true);
 	if (result != NO_DCS_ERROR) {
@@ -155,10 +160,10 @@ int main(void) {
 #endif // 0
 
 #if FUNC_TO_TEST == 1
-	Correlator_Setting_Type correlator_settings = {
+	Correlator_Setting correlator_settings = {
 		.Corr_Time = 5.5,
 		.Data_N = 4,
-		.Scale = 7,
+		.Scale = 10,
 	};
 	result = Set_Correlator_Setting(&correlator_settings);
 #endif // 1
@@ -168,9 +173,9 @@ int main(void) {
 #endif // 2
 
 #if FUNC_TO_TEST == 3
-	Analyzer_Setting_Type analyzer_settings_arr[TEST_ARRAY_LEN];
+	Analyzer_Setting analyzer_settings_arr[TEST_ARRAY_LEN];
 	for (int x = 0; x < TEST_ARRAY_LEN; x++) {
-		analyzer_settings_arr[x] = (Analyzer_Setting_Type) {
+		analyzer_settings_arr[x] = (Analyzer_Setting) {
 			.Alpha = 0.00001f,
 			.Beta = 0.5f,
 			.Db = 0.0f,
@@ -214,10 +219,10 @@ int main(void) {
 #endif // 9
 
 #if FUNC_TO_TEST == 8
-	Analyzer_Prefit_Param_Type prefit = (Analyzer_Prefit_Param_Type){
+	Analyzer_Prefit_Param prefit = (Analyzer_Prefit_Param){
 		.Precut = 5,
 		.PostCut = 10,
-		.Min_Intensity = 0.5,
+		.Min_Intensity = 80.0,
 		.Max_Intensity = 3.14159f,
 		.FitLimt = 4.5f,
 		.lightLeakage = 6.5f,
@@ -234,42 +239,27 @@ int main(void) {
 	//Sleep to give time for COM task to receive data and call callbacks.
 	Sleep(3000);
 
-	Corr_Intensity_Data** corr = calloc(sizeof * corr, 1);
+	Error_Message** corr = calloc(sizeof * corr, 1);
 	if (corr == NULL) {
-		Destroy_COM_Task();
-		return MEMORY_ALLOCATION_ERROR;
-	}
-
-	float** delays = calloc(sizeof * delays, 1);
-	if (delays == NULL) {
-		free(corr);
 		Destroy_COM_Task();
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
 	while (1) {
 		int num = 0;
-		int num2 = 0;
 
-		int res = Get_Corr_Intensity_Data_Data(corr, &num, delays, &num2);
+		int res = Get_Error_Message_Data(corr, &num);
 		//printf("Ret val: %d\n", res);
 		if (res != NO_DCS_ERROR) {
 			break;
 		}
 
-		Get_Corr_Intensity_Data_CB(*corr, num, *delays, num2);
+		Get_Error_Message_CB(*corr, num);
 		
-		for (int x = 0; x < num; x++) {
-#pragma warning (disable: 6001)
-			free((*corr)[x].pCorrBuf);
-#pragma warning (default: 6001)
-		}
 		free(*corr);
-		free(*delays);
 	}
 
 	free(corr);
-	free(delays);
 
 	//Sleep(2000);
 

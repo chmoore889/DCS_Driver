@@ -69,6 +69,7 @@ float itohf(float value);
 #define GET_CORR_INTENSITY 14
 #define GET_BFI_CORR_READY 15
 #define GET_INTENSITY 16
+#define GET_ERROR_ID 253
 #define GET_ERROR_MESSAGE 254
 #define CHECK_NET_CONNECTION 254
 #define STOP_DCS 255
@@ -161,6 +162,9 @@ int Receive_Analyzer_Prefit_Param(char* pDataBuf);
 
 //Receives logging messages from the DCS device and calls user-defined callback.
 int Receive_Error_Message(char* pDataBuf);
+
+//Receives the error code of an upcoming error.
+int Receive_Error_Code(char* pDataBuf);
 
 //Handles the acknowledgement frame from the DCS.
 int Receive_Command_ACK(char* pDataBuf);
