@@ -142,7 +142,7 @@ int main(void) {
 		.Get_BFI_Data = Get_BFI_Data,
 		.Get_Error_Message_CB = Get_Error_Message_CB,
 		.Get_BFI_Corr_Ready_CB = Get_BFI_Corr_Ready_CB,
-		//.Get_Corr_Intensity_Data_CB = Get_Corr_Intensity_Data_CB,
+		.Get_Corr_Intensity_Data_CB = Get_Corr_Intensity_Data_CB,
 		.Get_Intensity_Data_CB = Get_Intensity_Data_CB,
 	};
 	result = Initialize_COM_Task(address, callbacks, true);
