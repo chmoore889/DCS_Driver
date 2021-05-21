@@ -723,7 +723,7 @@ static void clear_Recv_FIFO(void) {
 	while (item != NULL) {
 		if (item->data_type == Corr_Intensity_Data_Type) {
 			Array_Data array_data[2] = { 0 };
-			memcpy(&array_data, item->data, sizeof(array_data) * 2);
+			memcpy(array_data, item->data, sizeof(*array_data) * 2);
 
 			Corr_Intensity_Data* data = array_data[0].ptr;
 			for (int x = 0; x < array_data[0].length; x++) {
