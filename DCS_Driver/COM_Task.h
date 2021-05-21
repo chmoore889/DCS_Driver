@@ -40,6 +40,7 @@ void Get_BFI_Data(BFI_Data* pBFI_Data, int Cha_Num);
 void Get_Error_Message_CB(char* pMessage, unsigned __int32 Size);
 void Get_BFI_Corr_Ready_CB(bool bReady);
 void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int Cha_Num, float* pDelayBuf, int Delay_Num);
+void Get_Intensity_Data_CB(Intensity_Data_Type* pIntensity_Data, int Cha_Num);
 
 typedef enum {
 	DCS_Status_Type,

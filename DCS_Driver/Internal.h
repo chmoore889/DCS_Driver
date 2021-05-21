@@ -68,6 +68,7 @@ float itohf(float value);
 #define GET_BFI_DATA 13
 #define GET_CORR_INTENSITY 14
 #define GET_BFI_CORR_READY 15
+#define GET_INTENSITY 16
 #define GET_ERROR_MESSAGE 254
 #define CHECK_NET_CONNECTION 254
 #define STOP_DCS 255
@@ -172,6 +173,9 @@ int Receive_BFI_Corr_Ready(char* pDataBuf);
 
 //Processes correlation intensity data and calls user-defined callback with the data.
 int Receive_Corr_Intensity_Data(char* pDataBuf);
+
+//Processes intensity data and calls user-defined callback with the data.
+int Receive_Intensity_Data(char* pDataBuf);
 
 //This function generates the frame to be sent to the remote DCS. 
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize);

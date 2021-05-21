@@ -279,11 +279,11 @@ int Send_Enable_DCS(bool bCorr, bool bAnalyzer) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	memcpy(&pDataBuf[index], &bCorr, sizeof(bCorr));
-	index += sizeof(bCorr);
-
 	memcpy(&pDataBuf[index], &bAnalyzer, sizeof(bAnalyzer));
 	index += sizeof(bAnalyzer);
+
+	memcpy(&pDataBuf[index], &bCorr, sizeof(bCorr));
+	index += sizeof(bCorr);
 
 	int result = Send_DCS_Command(ENABLE_CORR_ANALYZER, pDataBuf, BufferSize);
 
@@ -607,6 +607,40 @@ int Receive_Corr_Intensity_Data(char* pDataBuf) {
 #pragma warning (default: 6386 6385 6001)
 
 	return NO_DCS_ERROR;
+}
+
+int Receive_Intensity_Data(char* pDataBuf) {
+	unsigned __int32 index = 0;
+
+	//Number of channels to expect in following data.
+	unsigned __int32 numChannels;
+	memcpy(&numChannels, &pDataBuf[index], sizeof(numChannels));
+	numChannels = itohl(numChannels);
+	index += sizeof(numChannels);
+
+	//Allocating memory for numChannels channels of data.
+	Intensity_Data_Type* pIntensity_Data = malloc(sizeof(*pIntensity_Data) * numChannels);
+	if (pIntensity_Data == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	for (unsigned __int32 x = 0; x < numChannels; x++) {
+#pragma warning (disable: 6386 6385)
+		//Read the Cha_ID.
+		memcpy(&pIntensity_Data[x].Cha_ID, &pDataBuf[index], sizeof(pIntensity_Data[x].Cha_ID));
+		pIntensity_Data[x].Cha_ID = itohl(pIntensity_Data[x].Cha_ID);
+		index += sizeof(pIntensity_Data[x].Cha_ID);
+
+		//Read the intensity.
+		memcpy(&pIntensity_Data[x].intensity, &pDataBuf[index], sizeof(pIntensity_Data[x].intensity));
+		pIntensity_Data[x].intensity = itohf(pIntensity_Data[x].intensity);
+		index += sizeof(pIntensity_Data[x].intensity);
+#pragma warning (default: 6386 6385)
+	}
+
+	Get_Intensity_Data_CB(pIntensity_Data, numChannels);
+
+	free(pIntensity_Data);
 }
 
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize) {

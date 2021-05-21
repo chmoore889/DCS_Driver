@@ -114,6 +114,14 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int C
 	printf("\b\b]\n");
 }
 
+void Get_Intensity_Data_CB(Intensity_Data_Type* pIntensity_Data, int Cha_Num) {
+	printf("Intensity Data:\n");
+	for (int x = 0; x < Cha_Num; x++) {
+		printf("Channel %d:\n", pIntensity_Data[x].Cha_ID);
+		printf("\tIntensity: %f\n", pIntensity_Data[x].intensity);
+	}
+}
+
 int main(void) {
 	//Needed to detect and output memory leaks in debug mode.
 	_CrtSetDbgFlag(_CRTDBG_ALLOC_MEM_DF | _CRTDBG_LEAK_CHECK_DF);
@@ -135,6 +143,7 @@ int main(void) {
 		.Get_Error_Message_CB = Get_Error_Message_CB,
 		.Get_BFI_Corr_Ready_CB = Get_BFI_Corr_Ready_CB,
 		.Get_Corr_Intensity_Data_CB = Get_Corr_Intensity_Data_CB,
+		.Get_Intensity_Data_CB = Get_Intensity_Data_CB,
 	};
 	result = Initialize_COM_Task(address, callbacks, false);
 	if (result != NO_DCS_ERROR) {
@@ -179,7 +188,7 @@ int main(void) {
 #endif // 4
 
 #if FUNC_TO_TEST == 5
-	result = Enable_DCS(true, true);
+	result = Enable_DCS(false, true);
 
 	int ids[] = { 1, 2,};
 	result = Start_DCS_Measurement(5, ids, sizeof(ids) / sizeof(ids[0]));

@@ -396,7 +396,7 @@ static int Command_Sent;
 static bool Command_Ack;
 
 //TODO: finish this
-int Check_Command_Response(int Option, int Command_Code) {
+int Check_Command_Response(int Option, Data_ID Command_Code) {
 	if (Option == COMMAND_RSP_RESET) {
 		Command_Rsp_Count = MAX_COMMAND_RESPONSE_TIME;
 		Command_Ack = true;
@@ -602,6 +602,10 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 
 	case GET_CORR_INTENSITY:
 		err = Receive_Corr_Intensity_Data(pDataBuff);
+		break;
+
+	case GET_INTENSITY:
+		err = Receive_Intensity_Data(pDataBuff);
 		break;
 
 	default:
@@ -1064,5 +1068,15 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int C
 
 	if (local_callbacks.Get_Corr_Intensity_Data_CB != NULL) {
 		local_callbacks.Get_Corr_Intensity_Data_CB(pCorr_Intensity_Data, Cha_Num, pDelayBuf, Delay_Num);
+	}
+}
+
+void Get_Intensity_Data_CB(Intensity_Data_Type* pIntensity_Data, int Cha_Num) {
+	Receive_Callbacks local_callbacks = { 0 };
+	bool should_store = false;
+	get_Callbacks(&local_callbacks, &should_store);
+
+	if (local_callbacks.Get_Intensity_Data_CB != NULL) {
+		local_callbacks.Get_Intensity_Data_CB(pIntensity_Data, Cha_Num);
 	}
 }
