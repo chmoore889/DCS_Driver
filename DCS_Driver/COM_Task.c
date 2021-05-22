@@ -248,7 +248,7 @@ static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send)
 	if (tmp == NULL) {
 		free(data_to_send->pFrame);
 		free(data_to_send);
-		return 1;
+		return MEMORY_ALLOCATION_ERROR;
 	}
 
 	data_to_send->pFrame = tmp;
@@ -266,14 +266,14 @@ static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send)
 	//Send the data over the socket. data_to_send->size was not modified when prepending the frame size so it is added here.
 	int iResult = send(ConnectSocket, data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size), 0);
 	if (iResult == SOCKET_ERROR) {
-		printf("send failed with error: %d\n", WSAGetLastError());
+		//printf("send failed with error: %d\n", WSAGetLastError());
 		closesocket(ConnectSocket);
 		WSACleanup();
 	}
 	free(data_to_send->pFrame);
 	free(data_to_send);
 
-	printf("Bytes Sent: %d\n", iResult);
+	//printf("Bytes Sent: %d\n", iResult);
 
 	return iResult;
 }
@@ -297,7 +297,6 @@ static int recv_data(SOCKET ConnectSocket) {
 
 				closesocket(ConnectSocket);
 				WSACleanup();
-
 				return 1;
 			}
 
@@ -307,7 +306,13 @@ static int recv_data(SOCKET ConnectSocket) {
 		}
 		else if (iResult == 0) {
 			//Should never occur due to non-blocking socket.
-			printf("Connection closed\n");
+
+			//printf("Connection closed\n");
+			closesocket(ConnectSocket);
+			WSACleanup();
+
+			free(frame_data);
+			return 1;
 		}
 		else if (iResult < 0) {
 			//Socket should be set to non-blocking. This handles the would block error as success. Fails normally otherwise.
@@ -317,7 +322,12 @@ static int recv_data(SOCKET ConnectSocket) {
 				break;
 			}
 			else {
-				printf("recv failed with error: %d\n", err);
+				//printf("recv failed with error: %d\n", err);
+				closesocket(ConnectSocket);
+				WSACleanup();
+
+				free(frame_data);
+				return 1;
 			}
 		}
 	} while (iResult > 0);
@@ -360,7 +370,18 @@ static void COM_Task(void* socket_ptr) {
 		if (data_to_send != NULL) {
 			iResult = send_data(ConnectSocket, data_to_send);
 			if (iResult < 0) {
-				printf(ANSI_COLOR_RED"Sending Error\n"ANSI_COLOR_RESET);
+				char message[50];
+				//printf(ANSI_COLOR_RED"Sending Error\n"ANSI_COLOR_RESET);
+
+				int errorCode = WSAGetLastError();
+				if (errorCode == 0) {
+					_snprintf_s(message, sizeof(message), _TRUNCATE, "Error (0000): Connection closed");
+				}
+				else {
+					_snprintf_s(message, sizeof(message), _TRUNCATE, "Error (0000): send failed with error %d", errorCode);
+				}
+				Get_Error_Message_CB(message, (unsigned int) strlen(message));
+
 				_endthread();
 				return;
 			}
@@ -370,10 +391,18 @@ static void COM_Task(void* socket_ptr) {
 		iResult = recv_data(ConnectSocket);
 
 		if (iResult > 0) {
-			printf(ANSI_COLOR_RED"Fatal Receive Error\n"ANSI_COLOR_RESET);
+			//printf(ANSI_COLOR_RED"Fatal Receive Error\n"ANSI_COLOR_RESET);
 
-			closesocket(ConnectSocket);
-			WSACleanup();
+			char message[50];
+
+			int errorCode = WSAGetLastError();
+			if (errorCode == 0) {
+				_snprintf_s(message, sizeof(message), _TRUNCATE, "Error (0000): Connection closed");
+			}
+			else {
+				_snprintf_s(message, sizeof(message), _TRUNCATE, "Error (0000): recv failed with error %d", WSAGetLastError());
+			}
+			Get_Error_Message_CB(message, (unsigned int) strlen(message));
 
 			_endthread();
 			return;
