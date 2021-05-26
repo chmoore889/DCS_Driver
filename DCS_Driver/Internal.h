@@ -90,6 +90,8 @@ float itohf(float value);
 #define ANSI_COLOR_CYAN    "\x1b[36m"
 #define ANSI_COLOR_RESET   "\x1b[0m"
 
+#define CHECK_CONNECTION_FREQ 15
+
 //Frame version of DCS frame is a 16 bit integer.
 typedef unsigned __int16 Frame_Version;
 
@@ -105,6 +107,7 @@ typedef unsigned __int8 Checksum;
 typedef struct Transmission_Data_Type {
 	unsigned __int32 size; //Size of the transmission buffer
 	char* pFrame; //Pointer to the transmission buffer
+	Data_ID command_code;
 	struct Transmission_Data_Type* pNextItem; //Pointer to the next item in the queue.
 } Transmission_Data_Type;
 
@@ -180,6 +183,9 @@ int Receive_Corr_Intensity_Data(char* pDataBuf);
 
 //Processes intensity data and calls user-defined callback with the data.
 int Receive_Intensity_Data(char* pDataBuf);
+
+//Sends command to check network connection.
+int Send_Check_Network(void);
 
 //This function generates the frame to be sent to the remote DCS. 
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize);

@@ -476,11 +476,15 @@ int Receive_Error_Code(char* pDataBuf) {
 int Receive_Command_ACK(char* pDataBuf) {
 	Data_ID commandId;
 	memcpy(&commandId, pDataBuf, sizeof(commandId));
-	printf(ANSI_COLOR_GREEN"Command Ack: 0x%02x\n"ANSI_COLOR_RESET, commandId);
+	//printf(ANSI_COLOR_GREEN"Command Ack: 0x%02x\n"ANSI_COLOR_RESET, commandId);
 
-	//Check_Command_Response(COMMAND_RSP_VALIDATE, commandId);
+	int ret = Check_Command_Response(validate, commandId);
+	if (ret != 0) {
+		//Return a standard error instead.
+		ret = NETWORK_ERROR;
+	}
 
-	return NO_DCS_ERROR;
+	return ret;
 }
 
 int Receive_BFI_Data(char* pDataBuf) {
@@ -658,6 +662,10 @@ int Receive_Intensity_Data(char* pDataBuf) {
 	return NO_DCS_ERROR;
 }
 
+int Send_Check_Network(void) {
+	return Send_DCS_Command(CHECK_NET_CONNECTION, NULL, 0);
+}
+
 int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize) {
 	//Allocate memory for [pTransmission].
 	Transmission_Data_Type* pTransmission = malloc(sizeof(*pTransmission));
@@ -693,14 +701,17 @@ int Send_DCS_Command(Data_ID data_ID, char* pDataBuf, const unsigned __int32 Buf
 	index += sizeof(data_ID);
 
 	//Copy main data to output buffer.
-	memcpy(&pTransmission->pFrame[index], pDataBuf, BufferSize);
-	index += BufferSize;
+	if (pDataBuf != NULL) {
+		memcpy(&pTransmission->pFrame[index], pDataBuf, BufferSize);
+		index += BufferSize;
+	}
 
 	//Add checksum calculated from 2(Header) + 4(Type ID) + 4(Data ID) + BufferSize
 	pTransmission->pFrame[pTransmission->size - 1] = compute_checksum(pTransmission->pFrame, pTransmission->size - 1);
 
+	pTransmission->command_code = data_ID;
+
 	int result = Enqueue_Trans_FIFO(pTransmission);
-	Check_Command_Response(COMMAND_RSP_SET, data_ID);
 	return result;
 }
 

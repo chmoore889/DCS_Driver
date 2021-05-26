@@ -14,7 +14,7 @@
 #define HOST_NAME "129.49.117.79"
 
 #define TEST_ARRAY_LEN 6
-#define FUNC_TO_TEST 3
+#define FUNC_TO_TEST 2
 
 void Get_DCS_Status_CB(bool bCorr, bool bAnalyzer, int DCS_Cha_Num) {
 	printf("DCS Status:\n");
@@ -261,7 +261,7 @@ int main(void) {
 
 	free(corr);
 
-	//Sleep(2000);
+	Sleep(35000);
 
 	Destroy_COM_Task();
 	return result;

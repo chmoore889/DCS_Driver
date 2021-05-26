@@ -21,6 +21,7 @@
 #define THREAD_START_ERROR -7
 #define THREAD_ALREADY_EXISTS -8
 #define NETWORK_INIT_ERROR -9
+#define NETWORK_ERROR -10
 
 typedef struct {
 	int Data_N; //data number for correlation computation

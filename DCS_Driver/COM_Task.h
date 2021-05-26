@@ -4,10 +4,12 @@
 #include "DCS_Driver.h"
 
 #define MAX_COMMAND_RESPONSE_TIME 1000
-#define COMMAND_RSP_RESET 0
-#define COMMAND_RSP_SET 1
-#define COMMAND_RSP_CHECK 2
-#define COMMAND_RSP_VALIDATE 3
+typedef enum {
+	reset,
+	set,
+	check,
+	validate,
+} Command_Option;
 
 /// <summary>
 /// Adds the data to be transmitted to the transmission FIFO.

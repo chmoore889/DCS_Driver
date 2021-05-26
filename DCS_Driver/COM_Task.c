@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <crtdbg.h>
 #include <stdio.h>
+#include <time.h>
 #include <process.h>
 #include <ws2tcpip.h>
 
@@ -81,6 +82,13 @@ static int close_Recv_mutex(void);
 static void clear_Recv_FIFO(void);
 //Clears out data from the trans FIFO.
 static void clear_Trans_FIFO(void);
+
+static double last_Response_Time = 0.0;
+//Checks if difference between the last response and the current time is greater than CHECK_CONNECTION_FREQ.
+//Sends keep-alive command to maintain connection.
+static void check_Timer(void);
+//Resets last response time. Meant to be called when a response is receieved.
+static void reset_Timer(void);
 
 __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks, bool local_should_store) {
 	//Set the callback functions for receiving data whether the COM task exists or not.
@@ -166,6 +174,9 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 		WSACleanup();
 		return NETWORK_INIT_ERROR;
 	}
+
+	reset_Timer();
+	Check_Command_Response(reset, 0);
 
 	//Initialize a set mutex for stopping the thread later.
 	hRunMutex = CreateMutexW(NULL, true, NULL);
@@ -334,6 +345,7 @@ static int recv_data(SOCKET ConnectSocket) {
 
 	if (frame_data_size > 0) {
 		hexDump("recv", frame_data, frame_data_size);
+		reset_Timer();
 	}
 
 	//Loop over each frame that's available as multiple may have been received at once.
@@ -365,25 +377,39 @@ static void COM_Task(void* socket_ptr) {
 
 	//Repeat while RunMutex is still taken by the main thread. Clean up and exit when it's released.
 	while (WaitForSingleObject(hRunMutex, 50) == WAIT_TIMEOUT) {
-		//If data is waiting in the queue, send it, one at a time.
-		Transmission_Data_Type* data_to_send = Dequeue_Trans_FIFO();
-		if (data_to_send != NULL) {
-			iResult = send_data(ConnectSocket, data_to_send);
-			if (iResult < 0) {
-				char message[50];
-				//printf(ANSI_COLOR_RED"Sending Error\n"ANSI_COLOR_RESET);
+		int commandResp = Check_Command_Response(check, 0);
+		if (commandResp == 2) {
+			char message[] = "Error (0000): Command response timed out";
+			Get_Error_Message_CB(message, (unsigned int)strlen(message));
 
-				int errorCode = WSAGetLastError();
-				if (errorCode == 0) {
-					_snprintf_s(message, sizeof(message), _TRUNCATE, "Error (0000): Connection closed");
-				}
-				else {
-					_snprintf_s(message, sizeof(message), _TRUNCATE, "Error (0000): send failed with error %d", errorCode);
-				}
-				Get_Error_Message_CB(message, (unsigned int) strlen(message));
+			_endthread();
+			return;
+		}
+		else if(commandResp == 0) {
+			check_Timer();
 
-				_endthread();
-				return;
+			//If data is waiting in the queue, send it, one at a time.
+			Transmission_Data_Type* data_to_send = Dequeue_Trans_FIFO();
+			if (data_to_send != NULL) {
+				Check_Command_Response(set, data_to_send->command_code);
+
+				iResult = send_data(ConnectSocket, data_to_send);
+				if (iResult < 0) {
+					char message[50];
+					//printf(ANSI_COLOR_RED"Sending Error\n"ANSI_COLOR_RESET);
+
+					int errorCode = WSAGetLastError();
+					if (errorCode == 0) {
+						_snprintf_s(message, sizeof(message), _TRUNCATE, "Error (0000): Connection closed");
+					}
+					else {
+						_snprintf_s(message, sizeof(message), _TRUNCATE, "Error (0000): send failed with error %d", errorCode);
+					}
+					Get_Error_Message_CB(message, (unsigned int)strlen(message));
+
+					_endthread();
+					return;
+				}
 			}
 		}
 
@@ -419,44 +445,36 @@ static void COM_Task(void* socket_ptr) {
 	_endthread();
 }
 
-//TODO add mutexes to command reponse variables
-static int Command_Rsp_Count = MAX_COMMAND_RESPONSE_TIME;
-static int Command_Sent;
-static bool Command_Ack;
+int Check_Command_Response(Command_Option Option, Data_ID Command_Code) {
+	static int Command_Rsp_Count = MAX_COMMAND_RESPONSE_TIME;
+	static Data_ID Command_Sent;
+	static bool Command_Ack = true;
 
-//TODO: finish this
-int Check_Command_Response(int Option, Data_ID Command_Code) {
-	if (Option == COMMAND_RSP_RESET) {
-		Command_Rsp_Count = MAX_COMMAND_RESPONSE_TIME;
-		Command_Ack = true;
-		return 0;
-	}
-
-	if (Option == COMMAND_RSP_SET) {
-		Command_Ack = false;
-		Command_Sent = Command_Code;
-	}
-	
-	if (Option == COMMAND_RSP_CHECK) {
-		if (Command_Ack) {
-			return 0;
-		}
-		if (Command_Rsp_Count > 0) {
-			Command_Rsp_Count--;
-			return 1;
-		}
-		return 2;
-	}
-
-	if (Option == COMMAND_RSP_VALIDATE) {
-		if (Command_Code == Command_Sent) {
+	switch (Option) {
+		case reset:
+			Command_Rsp_Count = MAX_COMMAND_RESPONSE_TIME;
 			Command_Ack = true;
 			return 0;
-		}
-		return 1;
+		case set:
+			Command_Ack = false;
+			Command_Sent = Command_Code;
+			return 0;
+		case check:
+			if (Command_Ack) {
+				return 0;
+			}
+			if (Command_Rsp_Count > 0) {
+				Command_Rsp_Count--;
+				return 1;
+			}
+			return 2;
+		case validate:
+			if (Command_Code == Command_Sent) {
+				return Check_Command_Response(reset, Command_Code);
+			}
+			return 1;
 	}
-
-	return 2;
+	return 0;
 }
 
 int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission) {
@@ -593,57 +611,57 @@ static int process_recv(char* buff, unsigned __int32 buffLen) {
 	//Call the correct callbacks based on data id with pDataBuff.
 	int err = NO_DCS_ERROR;
 	switch (data_id) {
-	case GET_DCS_STATUS:
-		err = Receive_DCS_Status(pDataBuff);
-		break;
+		case GET_DCS_STATUS:
+			err = Receive_DCS_Status(pDataBuff);
+			break;
 
-	case GET_CORRELATOR_SETTING:
-		err = Receive_Correlator_Setting(pDataBuff);
-		break;
+		case GET_CORRELATOR_SETTING:
+			err = Receive_Correlator_Setting(pDataBuff);
+			break;
 
-	case GET_ANALYZER_SETTING:
-		err = Receive_Analyzer_Setting(pDataBuff);
-		break;
+		case GET_ANALYZER_SETTING:
+			err = Receive_Analyzer_Setting(pDataBuff);
+			break;
 
-	case GET_SIMULATED_DATA:
-		err = Receive_Simulated_Correlation(pDataBuff);
-		break;
+		case GET_SIMULATED_DATA:
+			err = Receive_Simulated_Correlation(pDataBuff);
+			break;
 
-	case GET_ANALYZER_PREFIT_PARAM:
-		err = Receive_Analyzer_Prefit_Param(pDataBuff);
-		break;
+		case GET_ANALYZER_PREFIT_PARAM:
+			err = Receive_Analyzer_Prefit_Param(pDataBuff);
+			break;
 
-	case COMMAND_ACK:
-		err = Receive_Command_ACK(pDataBuff);
-		break;
+		case COMMAND_ACK:
+			err = Receive_Command_ACK(pDataBuff);
+			break;
 
-	case GET_ERROR_MESSAGE:
-		err = Receive_Error_Message(pDataBuff);
-		break;
+		case GET_ERROR_MESSAGE:
+			err = Receive_Error_Message(pDataBuff);
+			break;
 
-	case GET_BFI_DATA:
-		err = Receive_BFI_Data(pDataBuff);
-		break;
+		case GET_BFI_DATA:
+			err = Receive_BFI_Data(pDataBuff);
+			break;
 
-	case GET_BFI_CORR_READY:
-		err = Receive_BFI_Corr_Ready(pDataBuff);
-		break;
+		case GET_BFI_CORR_READY:
+			err = Receive_BFI_Corr_Ready(pDataBuff);
+			break;
 
-	case GET_CORR_INTENSITY:
-		err = Receive_Corr_Intensity_Data(pDataBuff);
-		break;
+		case GET_CORR_INTENSITY:
+			err = Receive_Corr_Intensity_Data(pDataBuff);
+			break;
 
-	case GET_INTENSITY:
-		err = Receive_Intensity_Data(pDataBuff);
-		break;
+		case GET_INTENSITY:
+			err = Receive_Intensity_Data(pDataBuff);
+			break;
 
-	case GET_ERROR_ID:
-		err = Receive_Error_Code(pDataBuff);
-		break;
+		case GET_ERROR_ID:
+			err = Receive_Error_Code(pDataBuff);
+			break;
 
-	default:
-		printf(ANSI_COLOR_RED"Invalid Data ID: 0x%08X\n"ANSI_COLOR_RESET, data_id);
-		err = FRAME_INVALID_DATA;
+		default:
+			printf(ANSI_COLOR_RED"Invalid Data ID: 0x%08X\n"ANSI_COLOR_RESET, data_id);
+			err = FRAME_INVALID_DATA;
 	}
 
 	free(pDataBuff);
@@ -801,8 +819,25 @@ static void clear_Trans_FIFO(void) {
 	release_FIFO_mutex();
 }
 
+static void check_Timer(void) {
+	const clock_t currTime = clock();
+	const double currTimeSec = currTime / CLOCKS_PER_SEC;
+
+	if ((currTimeSec - last_Response_Time) >= CHECK_CONNECTION_FREQ) {
+		Send_Check_Network();
+		//printf("Checking Network\n");
+	}
+}
+
+static void reset_Timer(void) {
+	const clock_t currTime = clock();
+	last_Response_Time = currTime / CLOCKS_PER_SEC;
+}
+
+//////////////////////////////////////////////////////////////////////////////////////
 //Each of the following functions are internallly called callbacks. They will call the
 //user-defined callback it was passed in Initialize_COM_Task.
+//////////////////////////////////////////////////////////////////////////////////////
 
 #define GETTER_FUNCTION(arg) __declspec(dllexport) int Get_##arg##_Data(arg ## * output) {\
 	set_Recv_mutex();\
