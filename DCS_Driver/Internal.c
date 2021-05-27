@@ -400,7 +400,7 @@ int Send_Analyzer_Prefit_Param(Analyzer_Prefit_Param* pAnalyzer_Prefit_Param) {
 	network_Analyzer.FitLimt = htoof(pAnalyzer_Prefit_Param->FitLimt);
 	network_Analyzer.earlyLeakage = htoof(pAnalyzer_Prefit_Param->earlyLeakage);
 	network_Analyzer.lightLeakage = htoof(pAnalyzer_Prefit_Param->lightLeakage);
-	network_Analyzer.Model = &pAnalyzer_Prefit_Param->Model;
+	network_Analyzer.Model = pAnalyzer_Prefit_Param->Model;
 
 	//Copy to final output buffer.
 	memcpy(pDataBuf, &network_Analyzer, sizeof(network_Analyzer));
