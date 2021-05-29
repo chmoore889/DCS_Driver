@@ -261,7 +261,7 @@ int main(void) {
 
 	free(corr);
 
-	Sleep(35000);
+	//Sleep(35000);
 
 	Destroy_COM_Task();
 	return result;

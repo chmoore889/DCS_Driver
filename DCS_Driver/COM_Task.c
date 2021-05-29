@@ -209,7 +209,9 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 	}
 
 	//Start the COM task thread, calling the COM_Task function.
-	threadHandle = (HANDLE)_beginthread(COM_Task, 0, (void*)ConnectSocket);
+	SOCKET* heapSock = malloc(sizeof(ConnectSocket));
+	*heapSock = ConnectSocket;
+	threadHandle = (HANDLE)_beginthread(COM_Task, 0, (void*)heapSock);
 	if (threadHandle == NULL || PtrToLong(threadHandle) == -1L) {
 		CloseHandle(hRunMutex);
 		hRunMutex = NULL;
@@ -372,7 +374,9 @@ static int recv_data(SOCKET ConnectSocket) {
 //Function run by the COM task thread. Initiates connection to the DCS
 //and then continuously sends and receives data until Destroy_COM_Task is called.
 static void COM_Task(void* socket_ptr) {
-	SOCKET ConnectSocket = (SOCKET)socket_ptr;
+	SOCKET ConnectSocket = *(SOCKET*)socket_ptr;
+	free(socket_ptr);
+
 	int iResult = 0;
 
 	//Repeat while RunMutex is still taken by the main thread. Clean up and exit when it's released.
