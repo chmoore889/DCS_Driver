@@ -4,10 +4,14 @@
 #include <stdio.h>
 #include <WinSock2.h>
 
+#include "Server_Lib.h"
 #include "Internal.h"
 
 static int write_DCS_header(char** buff, unsigned int* to_send_data_size);
 static int write_command_ack_resp(char** to_send_data, unsigned int* to_send_data_size, Data_ID command_being_responded);
+static int prepend_command_ack(char** to_send_data, unsigned int* to_send_data_size, Data_ID command_being_responded);
+static int prepend_frame_size(char** to_send_data, unsigned int* to_send_data_size);
+
 static int Process_DCS_Status(char** to_send_data, unsigned int* to_send_data_size);
 static int Process_Corr_Set(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size);
 static int Process_Corr_Status(char** to_send_data, unsigned int* to_send_data_size);
@@ -116,9 +120,9 @@ int process_recv(char* received_data, unsigned int received_data_size, char** to
 
 		break;
 
-	//case GET_ERROR_MESSAGE:
+		//case GET_ERROR_MESSAGE:
 
-	//    break;
+		//    break;
 
 	case STOP_DCS:
 
@@ -133,15 +137,42 @@ int process_recv(char* received_data, unsigned int received_data_size, char** to
 	*to_send_data_size = header_size + main_frame_data_size + 1;
 	*to_send_data = malloc(*to_send_data_size);
 	if (*to_send_data == NULL) {
+		free(main_frame_data);
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
 	memcpy(&(*to_send_data)[0], dcs_header, header_size);
+	free(dcs_header);
+
 	memcpy(&(*to_send_data)[header_size], main_frame_data, main_frame_data_size);
 	free(main_frame_data);
 
 	unsigned __int8 checksum = compute_checksum(*to_send_data, header_size + main_frame_data_size);
 	memcpy(&(*to_send_data)[*to_send_data_size - 1], &checksum, sizeof(checksum));
+
+	//hexDump("Before frame size", *to_send_data, *to_send_data_size);
+	prepend_frame_size(to_send_data, to_send_data_size);
+	//hexDump("Before command ack", *to_send_data, *to_send_data_size);
+	prepend_command_ack(to_send_data, to_send_data_size, command_id);
+	//hexDump("After command ack", *to_send_data, *to_send_data_size);
+
+	return NO_DCS_ERROR;
+}
+
+static int prepend_frame_size(char** to_send_data, unsigned int* to_send_data_size) {
+	const unsigned int full_size = *to_send_data_size + sizeof(*to_send_data_size);
+	char* full_frame = malloc(full_size);
+	if (full_frame == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	memcpy(full_frame, to_send_data_size, sizeof(*to_send_data_size));
+	memcpy(&full_frame[sizeof(*to_send_data_size)], *to_send_data, *to_send_data_size);
+
+	free(*to_send_data);
+
+	*to_send_data = full_frame;
+	*to_send_data_size = full_size;
 
 	return NO_DCS_ERROR;
 }
@@ -317,13 +348,13 @@ static int Process_Analyzer_Status(char** to_send_data, unsigned int* to_send_da
 
 	for (int x = 0; x < Cha_Num; x++) {
 		data[x] = (Analyzer_Setting){
-			.Alpha = (float) 10.8 - x,
-			.Beta = (float) 9.7 - x,
-			.Db = (float) 8.6 - x,
-			.Distance = (float) 7.4 - x,
-			.mua0 = (float) 6.3 - x,
-			.musp = (float) 5.2 - x,
-			.Wavelength = (float) 4.1 - x,
+			.Alpha = (float)10.8 - x,
+			.Beta = (float)9.7 - x,
+			.Db = (float)8.6 - x,
+			.Distance = (float)7.4 - x,
+			.mua0 = (float)6.3 - x,
+			.musp = (float)5.2 - x,
+			.Wavelength = (float)4.1 - x,
 		};
 	}
 
@@ -349,7 +380,7 @@ static int Process_Analyzer_Status(char** to_send_data, unsigned int* to_send_da
 		data[x].Alpha = htoof(data[x].Alpha);
 		data[x].Beta = htoof(data[x].Beta);
 		data[x].Db = htoof(data[x].Db);
-		data[x].Distance = htoof(data[x].Distance); 
+		data[x].Distance = htoof(data[x].Distance);
 		data[x].mua0 = htoof(data[x].mua0);
 		data[x].musp = htoof(data[x].musp);
 		data[x].Wavelength = htoof(data[x].Wavelength);
@@ -436,7 +467,7 @@ static int Process_Simulated_Correlation(char** to_send_data, unsigned int* to_s
 	}
 
 	for (int x = 0; x < Data_Num; x++) {
-		pCorrBuf[x] = (float) (x + 0.2);
+		pCorrBuf[x] = (float)(x + 0.2);
 	}
 
 	//Copy values to buffer
@@ -519,8 +550,8 @@ static int Process_Analyzer_Prefit(char* received_data, unsigned int received_da
 	memcpy(&prefit, received_data, sizeof(prefit));
 
 	//Change network endianess to host
-	prefit.Precut = itohl((u_long) prefit.Precut);
-	prefit.PostCut = itohl((u_long) prefit.PostCut);
+	prefit.Precut = itohl((u_long)prefit.Precut);
+	prefit.PostCut = itohl((u_long)prefit.PostCut);
 	prefit.Min_Intensity = itohf(prefit.Min_Intensity);
 	prefit.Max_Intensity = itohf(prefit.Max_Intensity);
 	prefit.FitLimt = itohf(prefit.FitLimt);
@@ -603,14 +634,22 @@ static int write_DCS_header(char** buff, unsigned int* header_size) {
 
 //Writes a command acknowledgement frame with the given command_being_responded
 static int write_command_ack_resp(char** to_send_data, unsigned int* to_send_data_size, Data_ID command_being_responded) {
+	char* dcs_header = NULL;
+	unsigned int header_size = 0;;
+	write_DCS_header(&dcs_header, &header_size);
+
 	Data_ID data_id = COMMAND_ACK;
 	size_t index = 0;
 
-	*to_send_data_size = sizeof(command_being_responded) + sizeof(data_id);
+	*to_send_data_size = header_size + sizeof(command_being_responded) + sizeof(data_id) + 1;
 	*to_send_data = malloc(*to_send_data_size);
 	if (*to_send_data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
+
+	memcpy(&(*to_send_data)[index], dcs_header, header_size);
+	free(dcs_header);
+	index += header_size;
 
 	data_id = htool(data_id);
 	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
@@ -618,6 +657,41 @@ static int write_command_ack_resp(char** to_send_data, unsigned int* to_send_dat
 
 	command_being_responded = htool(command_being_responded);
 	memcpy(&(*to_send_data)[index], &command_being_responded, sizeof(command_being_responded));
+	index += sizeof(command_being_responded);
+
+	unsigned __int8 checksum = compute_checksum(*to_send_data, *to_send_data_size - sizeof(checksum));
+	memcpy(&(*to_send_data)[*to_send_data_size - sizeof(checksum)], &checksum, sizeof(checksum));
+
+	return NO_DCS_ERROR;
+}
+
+static int prepend_command_ack(char** to_send_data, unsigned int* to_send_data_size, Data_ID command_being_responded) {
+	char* command_ack;
+	unsigned int command_ack_len;
+
+	int res = write_command_ack_resp(&command_ack, &command_ack_len, command_being_responded);
+	if (res != NO_DCS_ERROR) {
+		return res;
+	}
+
+	//hexDump("Command Ack only", command_ack, command_ack_len);
+	prepend_frame_size(&command_ack, &command_ack_len);
+	//hexDump("Command Ack with size", command_ack, command_ack_len);
+
+	const unsigned int full_size = command_ack_len + *to_send_data_size;
+	char* full_frame = malloc(full_size);
+	if (full_frame == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	memcpy(full_frame, command_ack, command_ack_len);
+	memcpy(&full_frame[command_ack_len], *to_send_data, *to_send_data_size);
+
+	free(command_ack);
+	free(*to_send_data);
+
+	*to_send_data = full_frame;
+	*to_send_data_size = full_size;
 
 	return NO_DCS_ERROR;
 }
@@ -700,4 +774,54 @@ float itohf(float value) {
 		return swap_float(value);
 	}
 	return value;
+}
+
+//Convenience function for dumping data to stdout in debug builds, but nothing in release.
+void hexDump(const char* desc, const void* addr, const unsigned __int32 len) {
+#if defined(_DEBUG)
+	unsigned __int32 i;
+	unsigned char buff[17];
+	const unsigned char* pc = (const unsigned char*)addr;
+
+	// Output description if given.
+	if (desc != NULL)
+		printf("%s:\n", desc);
+
+	// Length checks.
+	if (len == 0) {
+		printf("  ZERO LENGTH\n");
+		return;
+	}
+
+	// Process every byte in the data.
+	for (i = 0; i < len; i++) {
+		// Multiple of 16 means new line (with line offset).
+		if ((i % 16) == 0) {
+			// Don't print ASCII buffer for the "zeroth" line.
+			if (i != 0)
+				printf("  %s\n", buff);
+			// Output the offset.
+			printf("  %04x ", i);
+		}
+
+		// Now the hex code for the specific character.
+		printf(" %02x", pc[i]);
+
+		// And buffer a printable ASCII character for later.
+		if ((pc[i] < 0x20) || (pc[i] > 0x7e)) // isprint() may be better.
+			buff[i % 16] = '.';
+		else
+			buff[i % 16] = pc[i];
+		buff[(i % 16) + 1] = '\0';
+	}
+
+	// Pad out last line if not exactly 16 characters.
+	while ((i % 16) != 0) {
+		printf("   ");
+		i++;
+	}
+
+	// And print the final ASCII buffer.
+	printf("  %s\n", buff);
+#endif
 }

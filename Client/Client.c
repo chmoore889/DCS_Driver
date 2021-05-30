@@ -11,7 +11,7 @@
 #include "COM_Task.h"
 
 #define DEFAULT_PORT "50000"
-#define HOST_NAME "129.49.117.79"
+#define HOST_NAME "localhost"
 
 #define TEST_ARRAY_LEN 6
 #define FUNC_TO_TEST 2

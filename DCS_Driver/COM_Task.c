@@ -90,7 +90,7 @@ static void check_Timer(void);
 //Resets last response time. Meant to be called when a response is receieved.
 static void reset_Timer(void);
 
-__declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks, bool local_should_store) {
+int Initialize_COM_Task(DCS_Address address, Receive_Callbacks local_callbacks, bool local_should_store) {
 	//Set the callback functions for receiving data whether the COM task exists or not.
 	//If the callbacks mutex isn't NULL, the COM task is already running so use the thread-safe callback setter.
 	if (hCallbacksMutex != NULL) {
@@ -210,7 +210,16 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 
 	//Start the COM task thread, calling the COM_Task function.
 	SOCKET* heapSock = malloc(sizeof(ConnectSocket));
+	if (heapSock == NULL) {
+		CloseHandle(hRunMutex);
+		hRunMutex = NULL;
+		close_FIFO_mutex();
+		close_Callback_mutex();
+		close_Recv_mutex();
+		return MEMORY_ALLOCATION_ERROR;
+	}
 	*heapSock = ConnectSocket;
+
 	threadHandle = (HANDLE)_beginthread(COM_Task, 0, (void*)heapSock);
 	if (threadHandle == NULL || PtrToLong(threadHandle) == -1L) {
 		CloseHandle(hRunMutex);
@@ -225,7 +234,7 @@ __declspec(dllexport) int Initialize_COM_Task(DCS_Address address, Receive_Callb
 	return NO_DCS_ERROR;
 }
 
-__declspec(dllexport) int Destroy_COM_Task() {
+int Destroy_COM_Task() {
 	clear_Recv_FIFO();
 
 	clear_Trans_FIFO();
@@ -843,7 +852,7 @@ static void reset_Timer(void) {
 //user-defined callback it was passed in Initialize_COM_Task.
 //////////////////////////////////////////////////////////////////////////////////////
 
-#define GETTER_FUNCTION(arg) __declspec(dllexport) int Get_##arg##_Data(arg ## * output) {\
+#define GETTER_FUNCTION(arg) int Get_##arg##_Data(arg ## * output) {\
 	set_Recv_mutex();\
 	Received_Data_Item* item = pRecv_Data_FIFO_Head;\
 	Received_Data_Item* prev_item = NULL;\
@@ -878,7 +887,7 @@ static void reset_Timer(void) {
 	return 1;\
 }
 
-#define ARRAY_GETTER_FUNCTION(arg) __declspec(dllexport) int Get_##arg##_Data(arg ## ** output, int* number) {\
+#define ARRAY_GETTER_FUNCTION(arg) int Get_##arg##_Data(arg ## ** output, int* number) {\
 	set_Recv_mutex();\
 	Received_Data_Item* item = pRecv_Data_FIFO_Head;\
 	Received_Data_Item* prev_item = NULL;\
@@ -1280,7 +1289,7 @@ void Get_Corr_Intensity_Data_CB(Corr_Intensity_Data* pCorr_Intensity_Data, int C
 	}
 }
 
-__declspec(dllexport) int Get_Corr_Intensity_Data_Data(Corr_Intensity_Data** output, int* number, float** pDelayBufOutput, int* Delay_Num_Output) {
+int Get_Corr_Intensity_Data_Data(Corr_Intensity_Data** output, int* number, float** pDelayBufOutput, int* Delay_Num_Output) {
 	set_Recv_mutex();
 	Received_Data_Item* item = pRecv_Data_FIFO_Head;
 	Received_Data_Item* prev_item = NULL;

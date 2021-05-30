@@ -2,6 +2,7 @@
 
 #include <stdlib.h>
 #include <stdbool.h>
+#include <WinSock2.h>
 
 enum Endianess
 {
@@ -69,15 +70,6 @@ host and the remote DCS. GET IDs are for the data from the DCS*/
 
 #define FRAME_VERSION 0xFF01
 
-//Error Codes
-#define NO_DCS_ERROR 0
-#define FRAME_CHECKSUM_ERROR -1
-#define FRAME_VERSION_ERROR -2
-#define FRAME_INVALID_DATA -3
-#define FRAME_DATA_CORRUPTION -4
-#define MEMORY_ALLOCATION_ERROR -5
-#define NETWORK_NOT_READY -6
-
 #define HEADER_SIZE 2
 #define TYPE_ID_SIZE 4
 #define DATA_ID_SIZE 4
@@ -140,3 +132,5 @@ int process_recv(char* received_data, unsigned int received_data_size, char** to
 
 unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size);
 bool check_checksum(char* pDataBuf, size_t size);
+
+void hexDump(const char* desc, const void* addr, const unsigned __int32 len);
