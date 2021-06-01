@@ -127,13 +127,15 @@ int process_recv(char* buff, unsigned __int32 buffLen) {
 			break;
 
 		case CHECK_NET_CONNECTION:
-
+			//Nothing to do here
 			break;
 
 		default:
 			printf("ERROR: Invalid Command Received");
 			return FRAME_INVALID_DATA;
 	}
+
+	free(pDataBuff);
 
 	return NO_DCS_ERROR;
 }
