@@ -2,7 +2,6 @@
 #include <stdlib.h>
 #include <crtdbg.h>
 #include <stdio.h>
-#include <WinSock2.h>
 
 #include "Server_Lib.h"
 #include "Internal.h"
