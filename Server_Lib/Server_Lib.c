@@ -15,8 +15,34 @@ static HANDLE hRunMutex;
 
 static void Listen_And_Handle(void* socket_ptr);
 
-static int handle_recv(SOCKET ClientSocket);
 static int make_socket_nonblocking(SOCKET socket);
+
+static Transmission_Data_Type* Dequeue_Trans_FIFO(void);
+
+// Pointer to the transmission FIFO head
+static Transmission_Data_Type* pTrans_FIFO_Head = NULL;
+// Pointer to the transmission FIFO tail
+static Transmission_Data_Type* pTrans_FIFO_Tail = NULL;
+
+//Handle of the mutex for adding to the FIFO queue.
+static HANDLE hFIFOMutex;
+
+//Initializes the handle for hFIFOMutex.
+static int init_FIFO_mutex(void);
+//Releases the handle for hFIFOMutex.
+static int close_FIFO_mutex(void);
+//Takes control of the hFIFOMutex.
+static inline void set_FIFO_mutex(void);
+//Releases control of the hFIFOMutex.
+static inline void release_FIFO_mutex(void);
+
+static void clear_Trans_FIFO(void);
+
+//Sends data passed to function and releases it when finished. Returns <0 on error.
+static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send);
+
+//Receives data from socket. Returns >0 on fatal error, <0 on non-fatal error.
+static int recv_data(SOCKET ConnectSocket);
 
 int Start_Server(const char* port) {
 	if (threadHandle != NULL || hRunMutex != NULL) {
@@ -90,6 +116,13 @@ int Start_Server(const char* port) {
 		return THREAD_START_ERROR;
 	}
 
+	iResult = init_FIFO_mutex();
+	if (iResult != NO_DCS_ERROR) {
+		CloseHandle(hRunMutex);
+		hRunMutex = NULL;
+		return iResult;
+	}
+
 	// Start thread to listen for connections
 	SOCKET* heapSock = malloc(sizeof(ListenSocket));
 	if (heapSock == NULL) {
@@ -117,15 +150,22 @@ int Start_Server(const char* port) {
 }
 
 int Stop_Server(void) {
-	//Release the run mutex to stop the thread.
-	ReleaseMutex(hRunMutex);
+	clear_Trans_FIFO();
 
-	//Wait for thread to close.
-	WaitForSingleObject(threadHandle, INFINITE);
+	//If the COM task isn't already stopped, free all the task's resources.
+	if (hRunMutex != NULL) {
+		//Release the run mutex to stop the thread.
+		ReleaseMutex(hRunMutex);
 
-	WaitForSingleObject(hRunMutex, INFINITE);
-	CloseHandle(hRunMutex);
-	hRunMutex = NULL;
+		//Wait for thread to close.
+		WaitForSingleObject(threadHandle, INFINITE);
+
+		WaitForSingleObject(hRunMutex, INFINITE);
+		CloseHandle(hRunMutex);
+		hRunMutex = NULL;
+
+		close_FIFO_mutex();
+	}
 
 	return NO_DCS_ERROR;
 }
@@ -172,8 +212,17 @@ static void Listen_And_Handle(void* socket_ptr) {
 
 		bool recv_failed = false;
 		while (WaitForSingleObject(hRunMutex, 50) == WAIT_TIMEOUT) {
-			iResult = handle_recv(ClientSocket);
-			if (iResult != NO_DCS_ERROR) {
+			Transmission_Data_Type* data_to_send = Dequeue_Trans_FIFO();
+			if (data_to_send != NULL) {
+				iResult = send_data(ClientSocket, data_to_send);
+				if (iResult < 0) {
+					recv_failed = true;
+					break;
+				}
+			}
+
+			iResult = recv_data(ClientSocket);
+			if (iResult > 0) {
 				recv_failed = true;
 				break;
 			}
@@ -193,96 +242,212 @@ static void Listen_And_Handle(void* socket_ptr) {
 	_endthread();
 }
 
-static int handle_recv(SOCKET ClientSocket) {
-	char* receivedData;
-	unsigned __int32 receivedDataSize;
+static int send_data(SOCKET ConnectSocket, Transmission_Data_Type* data_to_send) {
+	//Allocate more memory in preparation for prepending frame size (excluding itself) to the frame.
+	char* tmp = realloc(data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size));
+	if (tmp == NULL) {
+		free(data_to_send->pFrame);
+		free(data_to_send);
+		return MEMORY_ALLOCATION_ERROR;
+	}
 
-	//Get expected frame length
-	int iResult = recv(ClientSocket, (char*)&receivedDataSize, sizeof(receivedDataSize), 0);
+	data_to_send->pFrame = tmp;
 
-	if (iResult > 0) {
-		if (iResult != sizeof(receivedDataSize)) {
-			printf("There was a problem receiving the frame length\n");
-			printf("recv failed with error: %d\n", WSAGetLastError());
-			closesocket(ClientSocket);
+	//Shift pFrame sizeof(data_to_send->size) bytes to give space for the prepended frame size.
+	memmove(&data_to_send->pFrame[sizeof(data_to_send->size)], data_to_send->pFrame, data_to_send->size);
 
-			return 1;
-		}
+#pragma warning (disable: 6386)
+	//Write prepended data_to_send->size on the packet.
+	memcpy(data_to_send->pFrame, &data_to_send->size, sizeof(data_to_send->size));
+#pragma warning (default: 6386)
 
-		receivedData = malloc(receivedDataSize);
-		if (receivedData == NULL) {
-			closesocket(ClientSocket);
-			return 1;
-		}
+	hexDump("Data packet", data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size));
 
-		iResult = recv(ClientSocket, receivedData, receivedDataSize, 0);
+	//Send the data over the socket. data_to_send->size was not modified when prepending the frame size so it is added here.
+	int iResult = send(ConnectSocket, data_to_send->pFrame, data_to_send->size + sizeof(data_to_send->size), 0);
+	if (iResult == SOCKET_ERROR) {
+		//printf("send failed with error: %d\n", WSAGetLastError());
+		closesocket(ConnectSocket);
+	}
+	free(data_to_send->pFrame);
+	free(data_to_send);
 
-		if (iResult < 0) {
-			int err = WSAGetLastError();
-			if (err != WSAEWOULDBLOCK) {
-				printf("recv failed with error: %d\n", err);
-				closesocket(ClientSocket);
+	//printf("Bytes Sent: %d\n", iResult);
 
+	return iResult;
+}
+
+static int recv_data(SOCKET ConnectSocket) {
+	int iResult = 0;
+	char socket_buffer[1024];
+	char* frame_data = NULL;
+	unsigned int frame_data_size = 0;
+
+	//Receives data waiting in buffer. Continues if no data available as socket is non-blocking.
+	do {
+		iResult = recv(ConnectSocket, socket_buffer, sizeof(socket_buffer), 0);
+		if (iResult > 0) {
+			//Data is available. Write it to the frame_data buffer.
+			frame_data_size += iResult;
+
+			char* tmp = realloc(frame_data, frame_data_size);
+			if (tmp == NULL) {
+				free(frame_data);
+
+				closesocket(ConnectSocket);
 				return 1;
 			}
+
+			frame_data = tmp;
+
+			memcpy(&frame_data[frame_data_size - iResult], socket_buffer, iResult);
 		}
-		if (iResult == 0) {
+		else if (iResult == 0) {
 			//Should never occur due to non-blocking socket.
 
-			printf("Connection closed\n");
-			closesocket(ClientSocket);
+			//printf("Connection closed\n");
+			closesocket(ConnectSocket);
 
+			free(frame_data);
 			return 1;
 		}
-		if (iResult != receivedDataSize) {
-			printf("Unexpected amount of data received\n");
-			closesocket(ClientSocket);
+		else if (iResult < 0) {
+			//Socket should be set to non-blocking. This handles the would block error as success. Fails normally otherwise.
+			int err = WSAGetLastError();
+			if (err == WSAEWOULDBLOCK) {
+				//No error here. No data available so break from loop.
+				break;
+			}
+			else {
+				//printf("recv failed with error: %d\n", err);
+				closesocket(ConnectSocket);
 
-			return 1;
-		}
-
-		hexDump("Received", receivedData, receivedDataSize);
-
-		char* to_send;
-		unsigned __int32 to_send_size;
-		iResult = process_recv(receivedData, receivedDataSize, &to_send, &to_send_size);
-		printf("Process recv: %d\n", iResult);
-		free(receivedData);
-
-		hexDump("To send", to_send, to_send_size);
-
-		if (iResult == NO_DCS_ERROR) {
-			const int iSendResult = send(ClientSocket, to_send, to_send_size, 0);
-			if (iSendResult == SOCKET_ERROR) {
-				printf("send failed with error: %d\n", WSAGetLastError());
-				closesocket(ClientSocket);
-
-				free(to_send);
-
+				free(frame_data);
 				return 1;
 			}
-			free(to_send);
 		}
+	} while (iResult > 0);
+
+	if (frame_data_size > 0) {
+		hexDump("recv", frame_data, frame_data_size);
 	}
-	else if (iResult == 0) {
-		//Should never occur due to non-blocking socket.
 
-		printf("Connection closed\n");
-		closesocket(ClientSocket);
+	//Loop over each frame that's available as multiple may have been received at once.
+	for (unsigned __int32 totLen = 0; totLen < frame_data_size;) {
+		//Strip off 32 bit integer size from beginning of frame to make well-defined DCS frame `buff`
+		unsigned __int32 frameLen;
+		memcpy(&frameLen, &frame_data[totLen], sizeof(frameLen));
 
-		return 1;
-	}
-	else if (iResult < 0) {
-		//Socket should be set to non-blocking. This handles the would block error as success. Fails normally otherwise.
-		int err = WSAGetLastError();
-		if (err != WSAEWOULDBLOCK) {
-			//printf("recv failed with error: %d\n", err);
-			closesocket(ClientSocket);
-
-			return 1;
+		//Find pointer of received data and process it in process_recv.
+		char* buff = &frame_data[sizeof(frameLen) + totLen];
+		int tmpiResult = process_recv(buff, frameLen);
+		if (tmpiResult != NO_DCS_ERROR) {
+			iResult = tmpiResult;
 		}
+
+		totLen += sizeof(frameLen) + frameLen;
+		//printf("%d", iResult);
+	}
+	free(frame_data);
+
+	return iResult;
+}
+
+int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission) {
+	pTransmission->pNextItem = NULL;
+
+	set_FIFO_mutex();
+
+	//If FIFO is empty, this element is both the head and tail.
+	if (pTrans_FIFO_Head == NULL) {
+		pTrans_FIFO_Head = pTransmission;
+		pTrans_FIFO_Tail = pTransmission;
+	}
+	//Otherwise, add to the end of FIFO.
+	else {
+		pTrans_FIFO_Tail->pNextItem = pTransmission;
+		pTrans_FIFO_Tail = pTransmission;
+	}
+
+	release_FIFO_mutex();
+
+	return NO_DCS_ERROR;
+}
+
+static Transmission_Data_Type* Dequeue_Trans_FIFO() {
+	set_FIFO_mutex();
+
+	Transmission_Data_Type* pTransmission = pTrans_FIFO_Head;
+
+	//If the original FIFO head isn't null, shift the queue.
+	if (pTransmission != NULL) {
+		pTrans_FIFO_Head = pTrans_FIFO_Head->pNextItem;
+	}
+
+	//If the new FIFO head is null, the queue is empty.
+	if (pTrans_FIFO_Head == NULL) {
+		pTrans_FIFO_Tail = NULL;
+	}
+
+	release_FIFO_mutex();
+
+	return pTransmission;
+}
+
+
+static void clear_Trans_FIFO(void) {
+	set_FIFO_mutex();
+	Transmission_Data_Type* trans_data = pTrans_FIFO_Head;
+	while (trans_data != NULL) {
+		Transmission_Data_Type* tmp_item = trans_data;
+		trans_data = trans_data->pNextItem;
+
+		free(tmp_item->pFrame);
+		free(tmp_item);
+	}
+	pTrans_FIFO_Head = NULL;
+	pTrans_FIFO_Tail = NULL;
+	release_FIFO_mutex();
+}
+
+static int init_FIFO_mutex() {
+	if (hFIFOMutex != NULL) {
+		return THREAD_ALREADY_EXISTS;
+	}
+
+	hFIFOMutex = CreateMutexW(NULL, false, NULL);
+	if (hFIFOMutex == NULL) {
+		return THREAD_START_ERROR;
 	}
 	return NO_DCS_ERROR;
+}
+
+static int close_FIFO_mutex() {
+	if (hFIFOMutex == NULL) {
+		return NO_DCS_ERROR;
+	}
+
+	int result = CloseHandle(hFIFOMutex);
+
+	hFIFOMutex = NULL;
+
+	return result;
+}
+
+static inline void set_FIFO_mutex() {
+	if (hFIFOMutex == NULL) {
+		return;
+	}
+
+	WaitForSingleObject(hFIFOMutex, INFINITE);
+}
+
+static inline void release_FIFO_mutex() {
+	if (hFIFOMutex == NULL) {
+		return;
+	}
+
+	ReleaseMutex(hFIFOMutex);
 }
 
 static int make_socket_nonblocking(SOCKET socket) {

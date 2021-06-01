@@ -7,179 +7,140 @@
 #include "Server_Lib.h"
 #include "Internal.h"
 
-static int write_DCS_header(char** buff, unsigned int* to_send_data_size);
-static int write_command_ack_resp(char** to_send_data, unsigned int* to_send_data_size, Data_ID command_being_responded);
-static int prepend_command_ack(char** to_send_data, unsigned int* to_send_data_size, Data_ID command_being_responded);
-static int prepend_frame_size(char** to_send_data, unsigned int* to_send_data_size);
+static int Send_DCS_Data(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize);
+static int Send_Command_Ack(Data_ID id);
 
-static int Process_DCS_Status(char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Corr_Set(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Corr_Status(char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Analyzer_Set(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Analyzer_Status(char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Start_DCS(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Stop_DCS(char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Enable_DCS(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Simulated_Correlation(char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Optical_Set(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Analyzer_Prefit(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size);
-static int Process_Get_Analyzer_Prefit(char** to_send_data, unsigned int* to_send_data_size);
+static int Process_DCS_Status();
+static int Process_Corr_Set(char* buff);
+static int Process_Corr_Status();
+static int Process_Analyzer_Set(char* buff);
+static int Process_Analyzer_Status();
+static int Process_Start_DCS(char* buff);
+static int Process_Stop_DCS();
+static int Process_Enable_DCS(char* buff);
+static int Process_Simulated_Correlation();
+static int Process_Optical_Set(char* buff);
+static int Process_Analyzer_Prefit(char* buff);
+static int Process_Get_Analyzer_Prefit();
 
-int process_recv(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size) {
-	//Verify checksum
-	unsigned __int8 received_checksum;
+int process_recv(char* buff, unsigned __int32 buffLen) {
+	hexDump("process_recv", buff, buffLen);
 
-	//Copy checksum from frame
-	memcpy(&received_checksum, &received_data[received_data_size - 1], sizeof(received_checksum));
-	if (!check_checksum(received_data, received_data_size)) {
+	//Verify checksum.
+	if (!check_checksum(buff, buffLen)) {
+		printf("Checksum error\n");
 		return FRAME_CHECKSUM_ERROR;
 	}
 
+	unsigned __int32 index = 0; //Index to track position in buff.
+
 	//Ensure header is correct
-	unsigned __int16 header;
-	memcpy(&header, &received_data[0], HEADER_SIZE);
+	Frame_Version header;
+	memcpy(&header, &buff[index], sizeof(header));
+	index += sizeof(header);
+
 	header = itohs(header);
 	if (header != FRAME_VERSION) {
+		printf("Invalid header\n");
 		return FRAME_VERSION_ERROR;
 	}
 
+	//Ensure type id is correct.
+	Type_ID type_id;
+	memcpy(&type_id, &buff[index], sizeof(type_id));
+	index += sizeof(type_id);
 
-	//Ensure type id is correct
-	unsigned __int32 type_id;
-	memcpy(&type_id, &received_data[2], TYPE_ID_SIZE);
 	type_id = itohl(type_id);
 	if (type_id != COMMAND_ID) {
+		printf("Invalid Type ID\n");
 		return FRAME_INVALID_DATA;
 	}
 
+	//Get data id to later call correct callbacks based on data id.
+	Data_ID data_id;
+	memcpy(&data_id, &buff[index], sizeof(data_id));
+	index += sizeof(data_id);
 
-	//Return correct data based on command id
-	Data_ID command_id;
-	memcpy(&command_id, &received_data[6], DATA_ID_SIZE);
-	command_id = itohl(command_id);
+	data_id = itohl(data_id);
 
-	char* dcs_header = NULL;
-	unsigned int header_size = 0;;
-	write_DCS_header(&dcs_header, &header_size);
-
-	char* main_frame_data = NULL;
-	unsigned int main_frame_data_size = 0;
-
-	char* main_recv_data = &received_data[10];
-	unsigned int main_recv_data_size = received_data_size - DATA_ID_SIZE - TYPE_ID_SIZE - HEADER_SIZE - CHECKSUM_SIZE;
-	switch (command_id) {
-	case GET_DCS_STATUS:
-		Process_DCS_Status(&main_frame_data, &main_frame_data_size);
-		break;
-
-	case SET_CORRELATOR_SETTING:
-		Process_Corr_Set(main_recv_data, main_recv_data_size, &main_frame_data, &main_frame_data_size);
-		break;
-
-	case GET_CORRELATOR_SETTING:
-		Process_Corr_Status(&main_frame_data, &main_frame_data_size);
-		break;
-
-	case SET_ANALYZER_SETTING:
-		Process_Analyzer_Set(main_recv_data, main_recv_data_size, &main_frame_data, &main_frame_data_size);
-		break;
-
-	case GET_ANALYZER_SETTING:
-		Process_Analyzer_Status(&main_frame_data, &main_frame_data_size);
-		break;
-
-	case START_MEASUREMENT:
-		Process_Start_DCS(main_recv_data, main_recv_data_size, &main_frame_data, &main_frame_data_size);
-		break;
-
-	case STOP_MEASUREMENT:
-		Process_Stop_DCS(&main_frame_data, &main_frame_data_size);
-		break;
-
-	case ENABLE_CORR_ANALYZER:
-		Process_Enable_DCS(main_recv_data, main_recv_data_size, &main_frame_data, &main_frame_data_size);
-		break;
-
-	case GET_SIMULATED_DATA:
-		Process_Simulated_Correlation(&main_frame_data, &main_frame_data_size);
-		break;
-
-	case SET_ANALYZER_PREFIT_PARAM:
-		Process_Analyzer_Prefit(main_recv_data, main_recv_data_size, &main_frame_data, &main_frame_data_size);
-		break;
-
-	case GET_ANALYZER_PREFIT_PARAM:
-		Process_Get_Analyzer_Prefit(&main_frame_data, &main_frame_data_size);
-		break;
-
-	case SET_OPTICAL_PARAM:
-		Process_Optical_Set(main_recv_data, main_recv_data_size, &main_frame_data, &main_frame_data_size);
-		break;
-
-	case CHECK_NET_CONNECTION:
-
-		break;
-
-		//case GET_ERROR_MESSAGE:
-
-		//    break;
-
-	case STOP_DCS:
-
-		break;
-
-	default:
-		printf("ERROR: Invalid Command Received");
-		return FRAME_INVALID_DATA;
-	}
-
-	//Allocate memory for header, main data, and 1-byte checksum
-	*to_send_data_size = header_size + main_frame_data_size + 1;
-	*to_send_data = malloc(*to_send_data_size);
-	if (*to_send_data == NULL) {
-		free(main_frame_data);
+	//Obtain just the data portion of the frame and place in pDataBuff.
+	unsigned int pDataBuffLen = buffLen - sizeof(data_id) - sizeof(type_id) - sizeof(header) - sizeof(Checksum);
+	char* pDataBuff = malloc(pDataBuffLen);
+	if (pDataBuff == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	memcpy(&(*to_send_data)[0], dcs_header, header_size);
-	free(dcs_header);
+	memcpy(pDataBuff, &buff[index], pDataBuffLen);
+	index += pDataBuffLen;
 
-	memcpy(&(*to_send_data)[header_size], main_frame_data, main_frame_data_size);
-	free(main_frame_data);
+	Send_Command_Ack(data_id);
 
-	unsigned __int8 checksum = compute_checksum(*to_send_data, header_size + main_frame_data_size);
-	memcpy(&(*to_send_data)[*to_send_data_size - 1], &checksum, sizeof(checksum));
+	//Call the correct callbacks based on data id with pDataBuff.
+	int err = NO_DCS_ERROR;
+	switch (data_id) {
+		case GET_DCS_STATUS:
+			Process_DCS_Status();
+			break;
 
-	//hexDump("Before frame size", *to_send_data, *to_send_data_size);
-	prepend_frame_size(to_send_data, to_send_data_size);
-	//hexDump("Before command ack", *to_send_data, *to_send_data_size);
-	prepend_command_ack(to_send_data, to_send_data_size, command_id);
-	//hexDump("After command ack", *to_send_data, *to_send_data_size);
+		case SET_CORRELATOR_SETTING:
+			Process_Corr_Set(pDataBuff);
+			break;
 
-	return NO_DCS_ERROR;
-}
+		case GET_CORRELATOR_SETTING:
+			Process_Corr_Status();
+			break;
 
-static int prepend_frame_size(char** to_send_data, unsigned int* to_send_data_size) {
-	const unsigned int full_size = *to_send_data_size + sizeof(*to_send_data_size);
-	char* full_frame = malloc(full_size);
-	if (full_frame == NULL) {
-		return MEMORY_ALLOCATION_ERROR;
+		case SET_ANALYZER_SETTING:
+			Process_Analyzer_Set(pDataBuff);
+			break;
+
+		case GET_ANALYZER_SETTING:
+			Process_Analyzer_Status();
+			break;
+
+		case START_MEASUREMENT:
+			Process_Start_DCS(pDataBuff);
+			break;
+
+		case STOP_MEASUREMENT:
+			Process_Stop_DCS();
+			break;
+
+		case ENABLE_CORR_ANALYZER:
+			Process_Enable_DCS(pDataBuff);
+			break;
+
+		case GET_SIMULATED_DATA:
+			Process_Simulated_Correlation();
+			break;
+
+		case SET_ANALYZER_PREFIT_PARAM:
+			Process_Analyzer_Prefit(pDataBuff);
+			break;
+
+		case GET_ANALYZER_PREFIT_PARAM:
+			Process_Get_Analyzer_Prefit(pDataBuff);
+			break;
+
+		case SET_OPTICAL_PARAM:
+			Process_Optical_Set(pDataBuff);
+			break;
+
+		case CHECK_NET_CONNECTION:
+
+			break;
+
+		default:
+			printf("ERROR: Invalid Command Received");
+			return FRAME_INVALID_DATA;
 	}
-
-	memcpy(full_frame, to_send_data_size, sizeof(*to_send_data_size));
-	memcpy(&full_frame[sizeof(*to_send_data_size)], *to_send_data, *to_send_data_size);
-
-	free(*to_send_data);
-
-	*to_send_data = full_frame;
-	*to_send_data_size = full_size;
 
 	return NO_DCS_ERROR;
 }
 
 //Computes checksum from given buffer of given size
-unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size) {
-	unsigned __int8 xor_sum = 0;
+Checksum compute_checksum(char* pDataBuf, unsigned int size) {
+	Checksum xor_sum = 0;
 	for (size_t index = 0; index < size; index++) {
 		xor_sum ^= pDataBuf[index];
 	}
@@ -190,7 +151,7 @@ unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size) {
 //Checks given checksum from a full DCS frame
 //Returns true if checksum is valid
 bool check_checksum(char* pDataBuf, size_t size) {
-	unsigned __int8 xor_sum = 0;
+	Checksum xor_sum = 0;
 	for (size_t index = 0; index < size; index++) {
 		xor_sum ^= pDataBuf[index];
 	}
@@ -198,8 +159,7 @@ bool check_checksum(char* pDataBuf, size_t size) {
 	return xor_sum == 0x00;
 }
 
-//Allocates and writes DCS status to_send_data buffer and outputs size to_send_data_size
-static int Process_DCS_Status(char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_DCS_Status() {
 	bool bCorr; // TRUE if correlator is started, FALSE if the correlator is not started.
 	bool bAnalyzer; // TRUE if analyzer is started, FALSE if the analyzer is not started.
 	int DCS_Cha_Num; // number of total DCS channels on the remote DCS.
@@ -209,38 +169,43 @@ static int Process_DCS_Status(char** to_send_data, unsigned int* to_send_data_si
 	bAnalyzer = false;
 	DCS_Cha_Num = 3;
 
-	Data_ID data_id = GET_DCS_STATUS;
 	size_t index = 0;
 
-	*to_send_data_size = sizeof(bCorr) + sizeof(bAnalyzer) + sizeof(DCS_Cha_Num) + sizeof(data_id);
-	*to_send_data = malloc(*to_send_data_size);
-	if (*to_send_data == NULL) {
+	const unsigned int to_send_data_size = sizeof(bCorr) + sizeof(bAnalyzer) + sizeof(DCS_Cha_Num);
+	char* to_send_data = malloc(to_send_data_size);
+	if (to_send_data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	data_id = htool(data_id);
-	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
-	index += sizeof(data_id);
-
-	memcpy(&(*to_send_data)[index], &bCorr, sizeof(bCorr));
+	memcpy(&to_send_data[index], &bCorr, sizeof(bCorr));
 	index += sizeof(bCorr);
 
-	memcpy(&(*to_send_data)[index], &bAnalyzer, sizeof(bAnalyzer));
+	memcpy(&to_send_data[index], &bAnalyzer, sizeof(bAnalyzer));
 	index += sizeof(bAnalyzer);
 
 	DCS_Cha_Num = htool(DCS_Cha_Num);
-	memcpy(&(*to_send_data)[index], &DCS_Cha_Num, sizeof(DCS_Cha_Num));
+	memcpy(&to_send_data[index], &DCS_Cha_Num, sizeof(DCS_Cha_Num));
 
-	return NO_DCS_ERROR;
+	int result = Send_DCS_Data(GET_DCS_STATUS, to_send_data, to_send_data_size);
+	free(to_send_data);
+
+	return result;
 }
 
-static int Process_Corr_Set(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_Corr_Set(char* buff) {
 	int Data_N;
 	int Scale;
 	int Corr_Time;
-	memcpy(&Data_N, &received_data[0], sizeof(Data_N));
-	memcpy(&Scale, &received_data[4], sizeof(Scale));
-	memcpy(&Corr_Time, &received_data[8], sizeof(Corr_Time));
+
+	unsigned int index = 0;
+	memcpy(&Data_N, &buff[index], sizeof(Data_N));
+	index += sizeof(Data_N);
+
+	memcpy(&Scale, &buff[index], sizeof(Scale));
+	index += sizeof(Scale);
+
+	memcpy(&Corr_Time, &buff[index], sizeof(Corr_Time));
+	index += sizeof(Corr_Time);
 
 	//Change network endianess to host
 	Data_N = itohl(Data_N);
@@ -249,11 +214,10 @@ static int Process_Corr_Set(char* received_data, unsigned int received_data_size
 
 	printf("Setting Correlator Params:\nData_N: %d\nScale: %d\nCorr_Time: %d\n", Data_N, Scale, Corr_Time);
 
-	return write_command_ack_resp(to_send_data, to_send_data_size, SET_CORRELATOR_SETTING);
+	return NO_DCS_ERROR;
 }
 
-//Allocates and writes Corr settings to_send_data buffer and outputs size to_send_data_size
-static int Process_Corr_Status(char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_Corr_Status() {
 	int Data_N;
 	int Scale;
 	int Sample_Size;
@@ -263,39 +227,37 @@ static int Process_Corr_Status(char** to_send_data, unsigned int* to_send_data_s
 	Scale = 1;
 	Sample_Size = 3;
 
-	Data_ID data_id = GET_CORRELATOR_SETTING;
 	size_t index = 0;
 
-	*to_send_data_size = sizeof(Data_N) + sizeof(Scale) + sizeof(Sample_Size) + sizeof(data_id);
-	*to_send_data = malloc(*to_send_data_size);
-	if (*to_send_data == NULL) {
+	const unsigned int to_send_data_size = sizeof(Data_N) + sizeof(Scale) + sizeof(Sample_Size);
+	char* to_send_data = malloc(to_send_data_size);
+	if (to_send_data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	data_id = htool(data_id);
-	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
-	index += sizeof(data_id);
-
 	Data_N = htool(Data_N);
-	memcpy(&(*to_send_data)[index], &Data_N, sizeof(Data_N));
+	memcpy(&to_send_data[index], &Data_N, sizeof(Data_N));
 	index += sizeof(Data_N);
 
 	Scale = htool(Scale);
-	memcpy(&(*to_send_data)[index], &Scale, sizeof(Scale));
+	memcpy(&to_send_data[index], &Scale, sizeof(Scale));
 	index += sizeof(Scale);
 
 	Sample_Size = htool(Sample_Size);
-	memcpy(&(*to_send_data)[index], &Sample_Size, sizeof(Sample_Size));
+	memcpy(&to_send_data[index], &Sample_Size, sizeof(Sample_Size));
 
-	return NO_DCS_ERROR;
+	int result = Send_DCS_Data(GET_CORRELATOR_SETTING, to_send_data, to_send_data_size);
+	free(to_send_data);
+
+	return result;
 }
 
-static int Process_Analyzer_Set(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_Analyzer_Set(char* buff) {
 	Analyzer_Setting* settings;
 	int Cha_Num;
 
 	//Copy prepended number of channels to local
-	memcpy(&Cha_Num, &received_data[0], sizeof(Cha_Num));
+	memcpy(&Cha_Num, &buff[0], sizeof(Cha_Num));
 	Cha_Num = itohl(Cha_Num);
 
 	settings = malloc(sizeof(*settings) * Cha_Num);
@@ -305,7 +267,7 @@ static int Process_Analyzer_Set(char* received_data, unsigned int received_data_
 
 #pragma warning (disable: 6386 6385)
 	for (int x = 0; x < Cha_Num; x++) {
-		memcpy(&settings[x], &received_data[sizeof(Cha_Num) + sizeof(*settings) * x], sizeof(*settings));
+		memcpy(&settings[x], &buff[sizeof(Cha_Num) + sizeof(*settings) * x], sizeof(*settings));
 
 		//Change network endianess to host
 		settings[x].Alpha = itohf(settings[x].Alpha);
@@ -332,12 +294,11 @@ static int Process_Analyzer_Set(char* received_data, unsigned int received_data_
 
 	free(settings);
 
-	return write_command_ack_resp(to_send_data, to_send_data_size, SET_ANALYZER_SETTING);
+	return NO_DCS_ERROR;
 }
 
-//Allocates and writes Analyzer settings to_send_data buffer and outputs size to_send_data_size
-static int Process_Analyzer_Status(char** to_send_data, unsigned int* to_send_data_size) {
-	int Cha_Num = 5; //Fake cha num for testing
+static int Process_Analyzer_Status() {
+	int Cha_Num = 3; //Fake cha num for testing
 	Analyzer_Setting* data;
 
 	//Make fake analyzer setting data for testing
@@ -358,21 +319,16 @@ static int Process_Analyzer_Status(char** to_send_data, unsigned int* to_send_da
 		};
 	}
 
-	Data_ID data_id = GET_ANALYZER_SETTING;
 	size_t index = 0;
 
-	*to_send_data_size = sizeof(data_id) + sizeof(Cha_Num) + sizeof(Analyzer_Setting) * Cha_Num;
-	*to_send_data = malloc(*to_send_data_size);
-	if (*to_send_data == NULL) {
+	const unsigned int to_send_data_size = sizeof(Cha_Num) + sizeof(Analyzer_Setting) * Cha_Num;
+	char* to_send_data = malloc(to_send_data_size);
+	if (to_send_data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	data_id = htool(data_id);
-	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
-	index += sizeof(data_id);
-
 	unsigned int net_Cha_Num = htool(Cha_Num);
-	memcpy(&(*to_send_data)[index], &net_Cha_Num, sizeof(net_Cha_Num));
+	memcpy(&to_send_data[index], &net_Cha_Num, sizeof(net_Cha_Num));
 	index += sizeof(net_Cha_Num);
 
 	//Change to network endianess
@@ -386,27 +342,35 @@ static int Process_Analyzer_Status(char** to_send_data, unsigned int* to_send_da
 		data[x].Wavelength = htoof(data[x].Wavelength);
 	}
 
-	memcpy(&(*to_send_data)[index], data, sizeof(*data) * Cha_Num);
+	memcpy(&to_send_data[index], data, sizeof(*data) * Cha_Num);
 	free(data);
 
-	return NO_DCS_ERROR;
+	int result = Send_DCS_Data(GET_ANALYZER_SETTING, to_send_data, to_send_data_size);
+	free(to_send_data);
+
+	return result;
 }
 
-static int Process_Start_DCS(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_Start_DCS(char* buff) {
 	int Interval;
 	int* pCha_IDs;
 	int Cha_Num;
 
-	memcpy(&Interval, &received_data[0], sizeof(Interval));
+	unsigned int index = 0;
+	memcpy(&Interval, &buff[index], sizeof(Interval));
 	Interval = itohl(Interval);
-	memcpy(&Cha_Num, &received_data[4], sizeof(Cha_Num));
+	index += sizeof(Interval);
+
+	memcpy(&Cha_Num, &buff[index], sizeof(Cha_Num));
 	Cha_Num = itohl(Cha_Num);
+	index += sizeof(Cha_Num);
 
 	pCha_IDs = malloc(sizeof(*pCha_IDs) * Cha_Num);
 	if (pCha_IDs == NULL) {
-		return MEMORY_ALLOCATION_ALIGNMENT;
+		return MEMORY_ALLOCATION_ERROR;
 	}
-	memcpy(pCha_IDs, &received_data[8], sizeof(*pCha_IDs) * Cha_Num);
+	memcpy(pCha_IDs, &buff[index], sizeof(*pCha_IDs) * Cha_Num);
+	index += sizeof(*pCha_IDs) * Cha_Num;
 
 	//Change to network to host endian
 	for (int x = 0; x < Cha_Num; x++) {
@@ -425,32 +389,36 @@ static int Process_Start_DCS(char* received_data, unsigned int received_data_siz
 	}
 	printf("]\n");
 
-	return write_command_ack_resp(to_send_data, to_send_data_size, START_MEASUREMENT);
+	return NO_DCS_ERROR;
 }
 
-static int Process_Stop_DCS(char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_Stop_DCS() {
 	printf("Stopping DCS Measurement\n");
 
-	return write_command_ack_resp(to_send_data, to_send_data_size, STOP_MEASUREMENT);
+	return NO_DCS_ERROR;
 }
 
-static int Process_Enable_DCS(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_Enable_DCS(char* buff) {
 	bool bCorr;
 	bool bAnalyzer;
 
-	memcpy(&bCorr, &received_data[0], sizeof(bCorr));
+	unsigned int index = 0;
 
-	memcpy(&bAnalyzer, &received_data[1], sizeof(bAnalyzer));
+	memcpy(&bCorr, &buff[index], sizeof(bCorr));
+	index += sizeof(bCorr);
+
+	memcpy(&bAnalyzer, &buff[index], sizeof(bAnalyzer));
+	index += sizeof(bAnalyzer);
 
 	//Printing data for testing purposes
 	printf("Enable DCS\n");
 	printf("bCorr: %s\n", bCorr ? "true" : "false");
 	printf("bAnalyzer: %s\n", bAnalyzer ? "true" : "false");
 
-	return write_command_ack_resp(to_send_data, to_send_data_size, ENABLE_CORR_ANALYZER);
+	return NO_DCS_ERROR;
 }
 
-static int Process_Simulated_Correlation(char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_Simulated_Correlation() {
 	int Precut;
 	int Cha_ID;
 	int Data_Num;
@@ -471,47 +439,45 @@ static int Process_Simulated_Correlation(char** to_send_data, unsigned int* to_s
 	}
 
 	//Copy values to buffer
-	Data_ID data_id = GET_SIMULATED_DATA;
 	size_t index = 0;
 
-	*to_send_data_size = sizeof(data_id) + sizeof(Precut) + sizeof(Cha_ID) + sizeof(Data_Num) + sizeof(*pCorrBuf) * Data_Num;
-	*to_send_data = malloc(*to_send_data_size);
-	if (*to_send_data == NULL) {
+	unsigned int to_send_data_size = sizeof(Precut) + sizeof(Cha_ID) + sizeof(Data_Num) + sizeof(*pCorrBuf) * Data_Num;
+	char* to_send_data = malloc(to_send_data_size);
+	if (to_send_data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	data_id = htool(data_id);
-	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
-	index += sizeof(data_id);
-
 	Precut = htool(Precut);
-	memcpy(&(*to_send_data)[index], &Precut, sizeof(Precut));
+	memcpy(&to_send_data[index], &Precut, sizeof(Precut));
 	index += sizeof(Precut);
 
 	Cha_ID = htool(Cha_ID);
-	memcpy(&(*to_send_data)[index], &Cha_ID, sizeof(Cha_ID));
+	memcpy(&to_send_data[index], &Cha_ID, sizeof(Cha_ID));
 	index += sizeof(Cha_ID);
 
 	unsigned int net_Data_Num = htool(Data_Num);
-	memcpy(&(*to_send_data)[index], &net_Data_Num, sizeof(net_Data_Num));
+	memcpy(&to_send_data[index], &net_Data_Num, sizeof(net_Data_Num));
 	index += sizeof(net_Data_Num);
 
 	for (int x = 0; x < Data_Num; x++) {
 		pCorrBuf[x] = htoof(pCorrBuf[x]);
 	}
 
-	memcpy(&(*to_send_data)[index], pCorrBuf, sizeof(*pCorrBuf) * Data_Num);
+	memcpy(&to_send_data[index], pCorrBuf, sizeof(*pCorrBuf) * Data_Num);
 	free(pCorrBuf);
 
-	return NO_DCS_ERROR;
+	int result = Send_DCS_Data(GET_SIMULATED_DATA, to_send_data, to_send_data_size);
+	free(to_send_data);
+
+	return result;
 }
 
-static int Process_Optical_Set(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_Optical_Set(char* buff) {
 	Optical_Param_Type* param;
 	int Cha_Num;
 
 	//Copy prepended number of channels to local
-	memcpy(&Cha_Num, &received_data[0], sizeof(Cha_Num));
+	memcpy(&Cha_Num, &buff[0], sizeof(Cha_Num));
 	Cha_Num = itohl(Cha_Num);
 
 	param = malloc(sizeof(*param) * Cha_Num);
@@ -521,7 +487,7 @@ static int Process_Optical_Set(char* received_data, unsigned int received_data_s
 
 #pragma warning (disable: 6386 6385)
 	for (int x = 0; x < Cha_Num; x++) {
-		memcpy(&param[x], &received_data[sizeof(Cha_Num) + sizeof(*param) * x], sizeof(*param));
+		memcpy(&param[x], &buff[sizeof(Cha_Num) + sizeof(*param) * x], sizeof(*param));
 
 		//Change network endianess to host
 		param[x].Cha_ID = itohl((u_long)param[x].Cha_ID);
@@ -540,14 +506,14 @@ static int Process_Optical_Set(char* received_data, unsigned int received_data_s
 
 	free(param);
 
-	return write_command_ack_resp(to_send_data, to_send_data_size, SET_OPTICAL_PARAM);
+	return NO_DCS_ERROR;
 }
 
-static int Process_Analyzer_Prefit(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_Analyzer_Prefit(char* buff) {
 	Analyzer_Prefit_Param prefit;
 
 #pragma warning (disable: 6386 6385)
-	memcpy(&prefit, received_data, sizeof(prefit));
+	memcpy(&prefit, buff, sizeof(prefit));
 
 	//Change network endianess to host
 	prefit.Precut = itohl((u_long)prefit.Precut);
@@ -569,11 +535,10 @@ static int Process_Analyzer_Prefit(char* received_data, unsigned int received_da
 	printf("earlyLeakage: %f\n", prefit.earlyLeakage);
 	printf("Model: %s\n", prefit.Model ? "true" : "false");
 
-	return write_command_ack_resp(to_send_data, to_send_data_size, SET_ANALYZER_PREFIT_PARAM);
+	return NO_DCS_ERROR;
 }
 
-//Allocates and writes Analyzer prefit params to_send_data buffer and outputs size to_send_data_size
-static int Process_Get_Analyzer_Prefit(char** to_send_data, unsigned int* to_send_data_size) {
+static int Process_Get_Analyzer_Prefit() {
 	Analyzer_Prefit_Param data;
 
 	//Make fake analyzer prefit data for testing
@@ -588,16 +553,11 @@ static int Process_Get_Analyzer_Prefit(char** to_send_data, unsigned int* to_sen
 		.Model = true,
 	};
 
-	Data_ID data_id = GET_ANALYZER_PREFIT_PARAM;
-
-	*to_send_data_size = sizeof(data_id) + sizeof(data);
-	*to_send_data = malloc(*to_send_data_size);
-	if (*to_send_data == NULL) {
+	unsigned int to_send_data_size = sizeof(data);
+	char* to_send_data = malloc(to_send_data_size);
+	if (to_send_data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
-
-	data_id = htool(data_id);
-	memcpy(&(*to_send_data)[0], &data_id, sizeof(data_id));
 
 	//Change to network endianess
 	data.Precut = htool(data.Precut);
@@ -609,91 +569,63 @@ static int Process_Get_Analyzer_Prefit(char** to_send_data, unsigned int* to_sen
 	data.lightLeakage = htoof(data.lightLeakage);
 	data.earlyLeakage = htoof(data.earlyLeakage);
 
-	memcpy(&(*to_send_data)[4], &data, sizeof(data));
+	memcpy(to_send_data, &data, sizeof(data));
 
 	return NO_DCS_ERROR;
 }
 
-static int write_DCS_header(char** buff, unsigned int* header_size) {
-	const unsigned __int16 frame_version = htoos(FRAME_VERSION);
-	const unsigned __int32 command = htool(DATA_ID);
-
-	//Allocate just the header (2) and type id (4)
-	*header_size = sizeof(frame_version) + sizeof(command);
-
-	*buff = malloc(*header_size);
-	if (*buff == NULL) {
-		return MEMORY_ALLOCATION_ERROR;
-	}
-
-	memcpy(&(*buff)[0], &frame_version, sizeof(frame_version));
-	memcpy(&(*buff)[sizeof(frame_version)], &command, sizeof(command));
-
-	return NO_DCS_ERROR;
+static int Send_Command_Ack(Data_ID id) {
+	Data_ID networkID = htool(id);
+	return Send_DCS_Data(COMMAND_ACK, (char*) &id, sizeof(id));
 }
 
-//Writes a command acknowledgement frame with the given command_being_responded
-static int write_command_ack_resp(char** to_send_data, unsigned int* to_send_data_size, Data_ID command_being_responded) {
-	char* dcs_header = NULL;
-	unsigned int header_size = 0;;
-	write_DCS_header(&dcs_header, &header_size);
-
-	Data_ID data_id = COMMAND_ACK;
-	size_t index = 0;
-
-	*to_send_data_size = header_size + sizeof(command_being_responded) + sizeof(data_id) + 1;
-	*to_send_data = malloc(*to_send_data_size);
-	if (*to_send_data == NULL) {
+static int Send_DCS_Data(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize) {
+	//Allocate memory for [pTransmission].
+	Transmission_Data_Type* pTransmission = malloc(sizeof(*pTransmission));
+	if (pTransmission == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	memcpy(&(*to_send_data)[index], dcs_header, header_size);
-	free(dcs_header);
-	index += header_size;
+	//Transmission size = 2(Header) + 4(Type ID) + 4(Data ID) + BufferSize + 1 (Checksum)
+	pTransmission->size = sizeof(Frame_Version) + sizeof(Type_ID) + sizeof(Data_ID) + BufferSize + 1;
 
-	data_id = htool(data_id);
-	memcpy(&(*to_send_data)[index], &data_id, sizeof(data_id));
-	index += sizeof(data_id);
-
-	command_being_responded = htool(command_being_responded);
-	memcpy(&(*to_send_data)[index], &command_being_responded, sizeof(command_being_responded));
-	index += sizeof(command_being_responded);
-
-	unsigned __int8 checksum = compute_checksum(*to_send_data, *to_send_data_size - sizeof(checksum));
-	memcpy(&(*to_send_data)[*to_send_data_size - sizeof(checksum)], &checksum, sizeof(checksum));
-
-	return NO_DCS_ERROR;
-}
-
-static int prepend_command_ack(char** to_send_data, unsigned int* to_send_data_size, Data_ID command_being_responded) {
-	char* command_ack;
-	unsigned int command_ack_len;
-
-	int res = write_command_ack_resp(&command_ack, &command_ack_len, command_being_responded);
-	if (res != NO_DCS_ERROR) {
-		return res;
-	}
-
-	//hexDump("Command Ack only", command_ack, command_ack_len);
-	prepend_frame_size(&command_ack, &command_ack_len);
-	//hexDump("Command Ack with size", command_ack, command_ack_len);
-
-	const unsigned int full_size = command_ack_len + *to_send_data_size;
-	char* full_frame = malloc(full_size);
-	if (full_frame == NULL) {
+	unsigned __int32 index = 0; //Index to track position in pFrame.
+	pTransmission->pFrame = malloc(pTransmission->size);
+	if (pTransmission->pFrame == NULL) {
+		free(pTransmission);
 		return MEMORY_ALLOCATION_ERROR;
 	}
 
-	memcpy(full_frame, command_ack, command_ack_len);
-	memcpy(&full_frame[command_ack_len], *to_send_data, *to_send_data_size);
+	//Change frame version to output byte order and copy to output buffer.
+	const Frame_Version frame_version = htoos(FRAME_VERSION);
+#pragma warning (disable: 6386)
+	memcpy(&pTransmission->pFrame[index], &frame_version, sizeof(frame_version));
+	index += sizeof(frame_version);
+#pragma warning (default: 6386)
 
-	free(command_ack);
-	free(*to_send_data);
+	//Change command type to output byte order and copy to output buffer.
+	const Type_ID command = htool(DATA_ID);
+	memcpy(&pTransmission->pFrame[index], &command, sizeof(command));
+	index += sizeof(command);
 
-	*to_send_data = full_frame;
-	*to_send_data_size = full_size;
+	//Change data ID to output byte order and copy to output buffer.
+	const Data_ID data_ID_out = htool(data_ID);
+	memcpy(&pTransmission->pFrame[index], &data_ID, sizeof(data_ID));
+	index += sizeof(data_ID);
 
-	return NO_DCS_ERROR;
+	//Copy main data to output buffer.
+	if (pDataBuf != NULL) {
+		memcpy(&pTransmission->pFrame[index], pDataBuf, BufferSize);
+		index += BufferSize;
+	}
+
+	//Add checksum calculated from 2(Header) + 4(Type ID) + 4(Data ID) + BufferSize
+	pTransmission->pFrame[pTransmission->size - 1] = compute_checksum(pTransmission->pFrame, pTransmission->size - 1);
+
+	pTransmission->command_code = data_ID;
+
+	int result = Enqueue_Trans_FIFO(pTransmission);
+	return result;
 }
 
 ////////////////////////////////

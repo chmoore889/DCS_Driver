@@ -17,7 +17,7 @@ int main(void) {
 		return result;
 	}
 
-	Sleep(300000);
+	Sleep(INFINITE);
 
 	return Stop_Server();
 }

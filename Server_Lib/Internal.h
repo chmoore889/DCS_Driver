@@ -124,13 +124,30 @@ typedef struct {
 	float musp; // light scattering coefficient (1/cm)
 } Optical_Param_Type;
 
-//Processes received response passed as received_data
-//Outputs the data to respond with in internally allocated buffer to_send_data
-//Outputs size of to_send_data in to_send_data_size
-//Returns a DCS error code
-int process_recv(char* received_data, unsigned int received_data_size, char** to_send_data, unsigned int* to_send_data_size);
+//Frame version of DCS frame is a 16 bit integer.
+typedef unsigned __int16 Frame_Version;
+
+//Type id of DCS frame is a 32 bit integer.
+typedef unsigned __int32 Type_ID;
+
+//Data id of DCS frame is a 32 bit integer.
+typedef unsigned __int32 Data_ID;
+
+//Checksum of DCS frame is an 8 bit integer.
+typedef unsigned __int8 Checksum;
+
+int process_recv(char* buff, unsigned __int32 buffLen);
 
 unsigned __int8 compute_checksum(char* pDataBuf, unsigned int size);
 bool check_checksum(char* pDataBuf, size_t size);
 
 void hexDump(const char* desc, const void* addr, const unsigned __int32 len);
+
+typedef struct Transmission_Data_Type {
+	unsigned __int32 size; //Size of the transmission buffer
+	char* pFrame; //Pointer to the transmission buffer
+	Data_ID command_code;
+	struct Transmission_Data_Type* pNextItem; //Pointer to the next item in the queue.
+} Transmission_Data_Type;
+
+int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission);
