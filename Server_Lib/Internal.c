@@ -573,7 +573,10 @@ static int Process_Get_Analyzer_Prefit() {
 
 	memcpy(to_send_data, &data, sizeof(data));
 
-	return NO_DCS_ERROR;
+	int result = Send_DCS_Data(GET_ANALYZER_PREFIT_PARAM, to_send_data, to_send_data_size);
+	free(to_send_data);
+
+	return result;
 }
 
 static int Send_Command_Ack(Data_ID id) {
