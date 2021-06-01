@@ -24,18 +24,6 @@ static Transmission_Data_Type* pTrans_FIFO_Head = NULL;
 // Pointer to the transmission FIFO tail
 static Transmission_Data_Type* pTrans_FIFO_Tail = NULL;
 
-//Handle of the mutex for adding to the FIFO queue.
-static HANDLE hFIFOMutex;
-
-//Initializes the handle for hFIFOMutex.
-static int init_FIFO_mutex(void);
-//Releases the handle for hFIFOMutex.
-static int close_FIFO_mutex(void);
-//Takes control of the hFIFOMutex.
-static inline void set_FIFO_mutex(void);
-//Releases control of the hFIFOMutex.
-static inline void release_FIFO_mutex(void);
-
 static void clear_Trans_FIFO(void);
 
 //Sends data passed to function and releases it when finished. Returns <0 on error.
@@ -116,13 +104,6 @@ int Start_Server(const char* port) {
 		return THREAD_START_ERROR;
 	}
 
-	iResult = init_FIFO_mutex();
-	if (iResult != NO_DCS_ERROR) {
-		CloseHandle(hRunMutex);
-		hRunMutex = NULL;
-		return iResult;
-	}
-
 	// Start thread to listen for connections
 	SOCKET* heapSock = malloc(sizeof(ListenSocket));
 	if (heapSock == NULL) {
@@ -163,8 +144,6 @@ int Stop_Server(void) {
 		WaitForSingleObject(hRunMutex, INFINITE);
 		CloseHandle(hRunMutex);
 		hRunMutex = NULL;
-
-		close_FIFO_mutex();
 	}
 
 	return NO_DCS_ERROR;
@@ -356,8 +335,6 @@ static int recv_data(SOCKET ConnectSocket) {
 int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission) {
 	pTransmission->pNextItem = NULL;
 
-	set_FIFO_mutex();
-
 	//If FIFO is empty, this element is both the head and tail.
 	if (pTrans_FIFO_Head == NULL) {
 		pTrans_FIFO_Head = pTransmission;
@@ -369,14 +346,10 @@ int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission) {
 		pTrans_FIFO_Tail = pTransmission;
 	}
 
-	release_FIFO_mutex();
-
 	return NO_DCS_ERROR;
 }
 
 static Transmission_Data_Type* Dequeue_Trans_FIFO() {
-	set_FIFO_mutex();
-
 	Transmission_Data_Type* pTransmission = pTrans_FIFO_Head;
 
 	//If the original FIFO head isn't null, shift the queue.
@@ -389,14 +362,11 @@ static Transmission_Data_Type* Dequeue_Trans_FIFO() {
 		pTrans_FIFO_Tail = NULL;
 	}
 
-	release_FIFO_mutex();
-
 	return pTransmission;
 }
 
 
 static void clear_Trans_FIFO(void) {
-	set_FIFO_mutex();
 	Transmission_Data_Type* trans_data = pTrans_FIFO_Head;
 	while (trans_data != NULL) {
 		Transmission_Data_Type* tmp_item = trans_data;
@@ -407,47 +377,6 @@ static void clear_Trans_FIFO(void) {
 	}
 	pTrans_FIFO_Head = NULL;
 	pTrans_FIFO_Tail = NULL;
-	release_FIFO_mutex();
-}
-
-static int init_FIFO_mutex() {
-	if (hFIFOMutex != NULL) {
-		return THREAD_ALREADY_EXISTS;
-	}
-
-	hFIFOMutex = CreateMutexW(NULL, false, NULL);
-	if (hFIFOMutex == NULL) {
-		return THREAD_START_ERROR;
-	}
-	return NO_DCS_ERROR;
-}
-
-static int close_FIFO_mutex() {
-	if (hFIFOMutex == NULL) {
-		return NO_DCS_ERROR;
-	}
-
-	int result = CloseHandle(hFIFOMutex);
-
-	hFIFOMutex = NULL;
-
-	return result;
-}
-
-static inline void set_FIFO_mutex() {
-	if (hFIFOMutex == NULL) {
-		return;
-	}
-
-	WaitForSingleObject(hFIFOMutex, INFINITE);
-}
-
-static inline void release_FIFO_mutex() {
-	if (hFIFOMutex == NULL) {
-		return;
-	}
-
-	ReleaseMutex(hFIFOMutex);
 }
 
 static int make_socket_nonblocking(SOCKET socket) {
