@@ -21,12 +21,24 @@
     <ClCompile Include="Server_Lib.c">
       <Filter>Source Files</Filter>
     </ClCompile>
+    <ClCompile Include="Store.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
+    <ClCompile Include="Data_Gen.c">
+      <Filter>Source Files</Filter>
+    </ClCompile>
   </ItemGroup>
   <ItemGroup>
     <ClInclude Include="Server_Lib.h">
       <Filter>Header Files</Filter>
     </ClInclude>
     <ClInclude Include="Internal.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Store.h">
+      <Filter>Header Files</Filter>
+    </ClInclude>
+    <ClInclude Include="Data_Gen.h">
       <Filter>Header Files</Filter>
     </ClInclude>
   </ItemGroup>

@@ -7,6 +7,7 @@
 
 #include "Server_Lib.h"
 #include "Internal.h"
+#include "Store.h"
 
 #pragma comment (lib, "Ws2_32.lib")
 
@@ -104,6 +105,15 @@ int Start_Server(const char* port) {
 		return THREAD_START_ERROR;
 	}
 
+	iResult = init_Store();
+	if (iResult != NO_DCS_ERROR) {
+		closesocket(ListenSocket);
+		WSACleanup();
+		CloseHandle(hRunMutex);
+		hRunMutex = NULL;
+		return THREAD_START_ERROR;
+	}
+
 	// Start thread to listen for connections
 	SOCKET* heapSock = malloc(sizeof(ListenSocket));
 	if (heapSock == NULL) {
@@ -111,6 +121,7 @@ int Start_Server(const char* port) {
 		WSACleanup();
 		CloseHandle(hRunMutex);
 		hRunMutex = NULL;
+		close_Store();
 		return MEMORY_ALLOCATION_ERROR;
 	}
 	*heapSock = ListenSocket;
@@ -191,6 +202,8 @@ static void Listen_And_Handle(void* socket_ptr) {
 
 		bool recv_failed = false;
 		while (WaitForSingleObject(hRunMutex, 50) == WAIT_TIMEOUT) {
+			Handle_Measurement();
+
 			Transmission_Data_Type* data_to_send = Dequeue_Trans_FIFO();
 			if (data_to_send != NULL) {
 				iResult = send_data(ClientSocket, data_to_send);

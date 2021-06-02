@@ -2,12 +2,20 @@
 #include <stdlib.h>
 #include <crtdbg.h>
 #include <stdio.h>
+#include <math.h>
+#include <time.h>
 
 #include "Server_Lib.h"
 #include "Internal.h"
+#include "Store.h"
+#include "Data_Gen.h"
 
 static int Send_DCS_Data(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize);
 static int Send_Command_Ack(Data_ID id);
+
+static int Send_Intensity_Data(Intensity_Data* dataArray, unsigned __int32 arrLength);
+static int Send_BFI_Data(BFI_Data* dataArray, unsigned __int32 arrLength);
+static int Send_Corr_Intensity_Data(Corr_Intensity_Data* dataArray, unsigned __int32 arrLength, float* delays, unsigned __int32 delay_Num);
 
 static int Process_DCS_Status();
 static int Process_Corr_Set(char* buff);
@@ -160,15 +168,234 @@ bool check_checksum(char* pDataBuf, size_t size) {
 	return xor_sum == 0x00;
 }
 
-static int Process_DCS_Status() {
-	bool bCorr; // TRUE if correlator is started, FALSE if the correlator is not started.
-	bool bAnalyzer; // TRUE if analyzer is started, FALSE if the analyzer is not started.
-	int DCS_Cha_Num; // number of total DCS channels on the remote DCS.
+int Handle_Measurement() {
+	static double last_Measurement_Time = 0.0;
 
-	//Fake testing values
-	bCorr = true;
-	bAnalyzer = false;
-	DCS_Cha_Num = 3;
+	Measurement_Status status;
+	bool bCorrOut;
+	bool bAnalyzerOut;
+
+	int result = Get_Measurement_Status(&status);
+	if (result != NO_DCS_ERROR) {
+		return result;
+	}
+
+	result = Get_Measurement_Output_Data(&bCorrOut, &bAnalyzerOut);
+	if (result != NO_DCS_ERROR) {
+		return result;
+	}
+
+	if (status.measurement_going) {
+		const clock_t currTime = clock();
+		const double currTimeSec = currTime / CLOCKS_PER_SEC;
+
+		if ((currTimeSec - last_Measurement_Time) >= status.interval * 10 / 1000) {
+			int result = NO_DCS_ERROR;
+			if (bCorrOut) {
+#pragma warning (disable: 6386 6385 6001)
+				const unsigned __int8 delayAndCorrBufLen = 48;
+
+				//Generate fake data
+				Corr_Intensity_Data* arr = malloc(sizeof(*arr) * status.Cha_Num);
+				if (arr == NULL) {
+					return MEMORY_ALLOCATION_ERROR;
+				}
+				for (int x = 0; x < status.Cha_Num; x++) {
+					arr[x].Data_Num = delayAndCorrBufLen;
+					arr[x].pCorrBuf = malloc(delayAndCorrBufLen * sizeof(*arr[x].pCorrBuf));
+					if (arr[x].pCorrBuf == NULL) {
+						for (int y = 0; y < x; x++) {
+							free(arr[x].pCorrBuf);
+						}
+						free(arr);
+						return MEMORY_ALLOCATION_ERROR;
+					}
+				}
+
+				float* delays = malloc(delayAndCorrBufLen * sizeof(*delays));
+				if (delays == NULL) {
+					for (int x = 0; x < status.Cha_Num; x++) {
+						free(arr[x].pCorrBuf);
+					}
+					free(arr);
+					return MEMORY_ALLOCATION_ERROR;
+				}
+
+				result = gen_corr_intensity_data(status.ids, status.Cha_Num, arr, delays, delayAndCorrBufLen);
+				if (result != NO_DCS_ERROR) {
+					for (int x = 0; x < status.Cha_Num; x++) {
+						free(arr[x].pCorrBuf);
+					}
+					free(arr);
+					free(delays);
+					return result;
+				}
+
+				Send_Corr_Intensity_Data(arr, status.Cha_Num, delays, delayAndCorrBufLen);
+
+				for (int x = 0; x < status.Cha_Num; x++) {
+					free(arr[x].pCorrBuf);
+				}
+				free(arr);
+				free(delays);
+#pragma warning (default: 6386 6385 6001)
+			}
+			else {
+				//Generate fake data
+				Intensity_Data* arr = malloc(sizeof(*arr) * status.Cha_Num);
+				result = gen_intensity_data(status.ids, status.Cha_Num, arr);
+				if (result != NO_DCS_ERROR) {
+					free(arr);
+					return result;
+				}
+
+				Send_Intensity_Data(arr, status.Cha_Num);
+				free(arr);
+			}
+
+			if (bAnalyzerOut) {
+				//Generate fake data
+				BFI_Data* arr = malloc(sizeof(*arr) * status.Cha_Num);
+				result = gen_bfi_data(status.ids, status.Cha_Num, arr);
+				if (result != NO_DCS_ERROR) {
+					free(arr);
+					return result;
+				}
+
+				Send_BFI_Data(arr, status.Cha_Num);
+				free(arr);
+			}
+
+			last_Measurement_Time = currTimeSec;
+		}
+	}
+	return NO_DCS_ERROR;
+}
+
+static int Send_Intensity_Data(Intensity_Data* dataArray, unsigned __int32 arrLength) {
+	const unsigned int to_send_data_size = sizeof(arrLength) + arrLength * sizeof(*dataArray);
+	char* to_send_data = malloc(to_send_data_size);
+	if (to_send_data == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	size_t index = 0;
+	memcpy(&to_send_data[index], &arrLength, sizeof(arrLength));
+	index += sizeof(arrLength);
+
+	for (unsigned int x = 0; x < arrLength; x++) {
+		int netCha_Id = htool(dataArray[x].Cha_ID);
+		memcpy(&to_send_data[index], &netCha_Id, sizeof(netCha_Id));
+		index += sizeof(netCha_Id);
+
+		float netIntensity = htoof(dataArray[x].intensity);
+		memcpy(&to_send_data[index], &netIntensity, sizeof(netIntensity));
+		index += sizeof(netIntensity);
+	}
+
+	int result = Send_DCS_Data(GET_INTENSITY, to_send_data, to_send_data_size);
+	free(to_send_data);
+
+	return result;
+}
+
+static int Send_BFI_Data(BFI_Data* dataArray, unsigned __int32 arrLength) {
+	const unsigned int to_send_data_size = sizeof(arrLength) + arrLength * sizeof(*dataArray);
+	char* to_send_data = malloc(to_send_data_size);
+	if (to_send_data == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	size_t index = 0;
+	memcpy(&to_send_data[index], &arrLength, sizeof(arrLength));
+	index += sizeof(arrLength);
+
+	for (unsigned int x = 0; x < arrLength; x++) {
+		int netCha_Id = htool(dataArray[x].Cha_ID);
+		memcpy(&to_send_data[index], &netCha_Id, sizeof(netCha_Id));
+		index += sizeof(netCha_Id);
+
+		float netBFI = htoof(dataArray[x].BFI);
+		memcpy(&to_send_data[index], &netBFI, sizeof(netBFI));
+		index += sizeof(netBFI);
+
+		float netBeta = htoof(dataArray[x].Beta);
+		memcpy(&to_send_data[index], &netBeta, sizeof(netBeta));
+		index += sizeof(netBeta);
+
+		float netrMSE = htoof(dataArray[x].rMSE);
+		memcpy(&to_send_data[index], &netrMSE, sizeof(netrMSE));
+		index += sizeof(netrMSE);
+	}
+
+	int result = Send_DCS_Data(GET_BFI_DATA, to_send_data, to_send_data_size);
+	free(to_send_data);
+
+	return result;
+}
+
+static int Send_Corr_Intensity_Data(Corr_Intensity_Data* dataArray, unsigned __int32 arrLength, float* delays, unsigned __int32 delay_Num) {
+	unsigned int corrValSize = 0;
+
+	//Calculate size of nested correlation values
+	for (unsigned int x = 0; x < arrLength; x++) {
+		corrValSize += dataArray[x].Data_Num * sizeof(*dataArray[x].pCorrBuf);
+	}
+
+	const unsigned int to_send_data_size = sizeof(arrLength) + arrLength * (sizeof(dataArray->Cha_ID) + sizeof(dataArray->intensity) + sizeof(dataArray->Data_Num)) + corrValSize + sizeof(delay_Num) + delay_Num * sizeof(*delays);
+	char* to_send_data = malloc(to_send_data_size);
+	if (to_send_data == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	size_t index = 0;
+	memcpy(&to_send_data[index], &arrLength, sizeof(arrLength));
+	index += sizeof(arrLength);
+
+	for (unsigned int x = 0; x < arrLength; x++) {
+		int netCha_Id = htool(dataArray[x].Cha_ID);
+		memcpy(&to_send_data[index], &netCha_Id, sizeof(netCha_Id));
+		index += sizeof(netCha_Id);
+
+		float netIntensity = htoof(dataArray[x].intensity);
+		memcpy(&to_send_data[index], &netIntensity, sizeof(netIntensity));
+		index += sizeof(netIntensity);
+
+		int netDataN = htool(dataArray[x].Data_Num);
+		memcpy(&to_send_data[index], &netDataN, sizeof(netDataN));
+		index += sizeof(netDataN);
+
+		for (int y = 0; y < dataArray[x].Data_Num; y++) {
+			float netCorr = htoof(dataArray[x].pCorrBuf[y]);
+			memcpy(&to_send_data[index], &netCorr, sizeof(netCorr));
+			index += sizeof(netCorr);
+		}
+	}
+
+	//Add delays
+	int netDelayNum = htool(delay_Num);
+	memcpy(&to_send_data[index], &netDelayNum, sizeof(netDelayNum));
+	index += sizeof(netDelayNum);
+
+	for (unsigned int x = 0; x < delay_Num; x++) {
+		float netDelay = htoof(delays[x]);
+		memcpy(&to_send_data[index], &netDelay, sizeof(netDelay));
+		index += sizeof(netDelay);
+	}
+
+	int result = Send_DCS_Data(GET_CORR_INTENSITY, to_send_data, to_send_data_size);
+	free(to_send_data);
+
+	return result;
+}
+
+static int Process_DCS_Status() {
+	DCS_Status status;
+	Get_DCS_Status_Data(&status);
+
+	bool bCorr = status.bCorr;
+	bool bAnalyzer = status.bAnalyzer;
+	int DCS_Cha_Num = status.DCS_Cha_Num;
 
 	size_t index = 0;
 
@@ -196,7 +423,7 @@ static int Process_DCS_Status() {
 static int Process_Corr_Set(char* buff) {
 	int Data_N;
 	int Scale;
-	int Corr_Time;
+	int Sample_Size;
 
 	unsigned int index = 0;
 	memcpy(&Data_N, &buff[index], sizeof(Data_N));
@@ -205,28 +432,32 @@ static int Process_Corr_Set(char* buff) {
 	memcpy(&Scale, &buff[index], sizeof(Scale));
 	index += sizeof(Scale);
 
-	memcpy(&Corr_Time, &buff[index], sizeof(Corr_Time));
-	index += sizeof(Corr_Time);
+	memcpy(&Sample_Size, &buff[index], sizeof(Sample_Size));
+	index += sizeof(Sample_Size);
 
 	//Change network endianess to host
 	Data_N = itohl(Data_N);
 	Scale = itohl(Scale);
-	Corr_Time = itohl(Corr_Time);
+	Sample_Size = itohl(Sample_Size);
 
-	printf("Setting Correlator Params:\nData_N: %d\nScale: %d\nCorr_Time: %d\n", Data_N, Scale, Corr_Time);
+	//printf("Setting Correlator Params:\nData_N: %d\nScale: %d\nCorr_Time: %d\n", Data_N, Scale, Corr_Time);
+	const Correlator_Setting setting = {
+		.Data_N = Data_N,
+		.Corr_Time = (float)2e-7 * Sample_Size * Data_N,
+		.Scale = Scale,
+	};
+	Set_Correlator_Setting_Data(setting);
 
 	return NO_DCS_ERROR;
 }
 
 static int Process_Corr_Status() {
-	int Data_N;
-	int Scale;
-	int Sample_Size;
+	Correlator_Setting setting;
+	Get_Correlator_Setting_Data(&setting);
 
-	//Fake testing values
-	Data_N = 16384;
-	Scale = 1;
-	Sample_Size = 3;
+	int Data_N = setting.Data_N;
+	int Scale = setting.Scale;
+	int Sample_Size = (int) ceil(setting.Corr_Time / setting.Data_N / 200e-9);
 
 	size_t index = 0;
 
@@ -281,17 +512,7 @@ static int Process_Analyzer_Set(char* buff) {
 	}
 #pragma warning (default: 6386 6385)
 
-	//Print received settings for testing purposes
-	for (int x = 0; x < Cha_Num; x++) {
-		printf("Settings %d\n", x);
-		printf("Alpha: %f\n", settings[x].Alpha);
-		printf("Beta: %f\n", settings[x].Beta);
-		printf("Db: %f\n", settings[x].Db);
-		printf("Distance: %f\n", settings[x].Distance);
-		printf("mua0: %f\n", settings[x].mua0);
-		printf("musp: %f\n", settings[x].musp);
-		printf("Wavelength: %f\n\n", settings[x].Wavelength);
-	}
+	Set_Analyzer_Setting_Data(settings, Cha_Num);
 
 	free(settings);
 
@@ -299,26 +520,9 @@ static int Process_Analyzer_Set(char* buff) {
 }
 
 static int Process_Analyzer_Status() {
-	int Cha_Num = 3; //Fake cha num for testing
 	Analyzer_Setting* data;
-
-	//Make fake analyzer setting data for testing
-	data = malloc(sizeof(*data) * Cha_Num);
-	if (data == NULL) {
-		return MEMORY_ALLOCATION_ERROR;
-	}
-
-	for (int x = 0; x < Cha_Num; x++) {
-		data[x] = (Analyzer_Setting){
-			.Alpha = (float)10.8 - x,
-			.Beta = (float)9.7 - x,
-			.Db = (float)8.6 - x,
-			.Distance = (float)7.4 - x,
-			.mua0 = (float)6.3 - x,
-			.musp = (float)5.2 - x,
-			.Wavelength = (float)4.1 - x,
-		};
-	}
+	int Cha_Num;
+	Get_Analyzer_Setting_Data(&data, &Cha_Num);
 
 	size_t index = 0;
 
@@ -380,21 +584,15 @@ static int Process_Start_DCS(char* buff) {
 #pragma warning (default: 6386)
 	}
 
-	//Printing data for testing purposes
-	printf("Start DCS\n");
-	printf("Interval: %d\n", Interval);
-	printf("Cha_Num: %d\n", Cha_Num);
-	printf("Ids: [\n");
-	for (int x = 0; x < Cha_Num; x++) {
-		printf("\t%d\n", pCha_IDs[x]);
-	}
-	printf("]\n");
+	Start_Measurement(Interval, Cha_Num, pCha_IDs);
+
+	free(pCha_IDs);
 
 	return NO_DCS_ERROR;
 }
 
 static int Process_Stop_DCS() {
-	printf("Stopping DCS Measurement\n");
+	Stop_Measurement();
 
 	return NO_DCS_ERROR;
 }
@@ -405,16 +603,13 @@ static int Process_Enable_DCS(char* buff) {
 
 	unsigned int index = 0;
 
-	memcpy(&bCorr, &buff[index], sizeof(bCorr));
-	index += sizeof(bCorr);
-
 	memcpy(&bAnalyzer, &buff[index], sizeof(bAnalyzer));
 	index += sizeof(bAnalyzer);
 
-	//Printing data for testing purposes
-	printf("Enable DCS\n");
-	printf("bCorr: %s\n", bCorr ? "true" : "false");
-	printf("bAnalyzer: %s\n", bAnalyzer ? "true" : "false");
+	memcpy(&bCorr, &buff[index], sizeof(bCorr));
+	index += sizeof(bCorr);
+
+	Set_Measurement_Output_Data(bCorr, bAnalyzer);
 
 	return NO_DCS_ERROR;
 }
@@ -497,13 +692,7 @@ static int Process_Optical_Set(char* buff) {
 	}
 #pragma warning (default: 6386 6385)
 
-	//Print received settings for testing purposes
-	for (int x = 0; x < Cha_Num; x++) {
-		printf("Settings %d\n", x);
-		printf("Cha_ID: %d\n", param[x].Cha_ID);
-		printf("mua0: %f\n", param[x].mua0);
-		printf("musp: %f\n", param[x].musp);
-	}
+	Set_Optical_Param_Data(param, Cha_Num);
 
 	free(param);
 
@@ -526,35 +715,16 @@ static int Process_Analyzer_Prefit(char* buff) {
 	prefit.earlyLeakage = itohf(prefit.earlyLeakage);
 #pragma warning (default: 6386 6385)
 
-	//Print received prefit for testing purposes
-	printf("Precut: %d\n", prefit.Precut);
-	printf("PostCut: %d\n", prefit.PostCut);
-	printf("Min_Intensity: %f\n", prefit.Min_Intensity);
-	printf("Max_Intensity: %f\n", prefit.Max_Intensity);
-	printf("FitLimt: %f\n", prefit.FitLimt);
-	printf("lightLeakage: %f\n", prefit.lightLeakage);
-	printf("earlyLeakage: %f\n", prefit.earlyLeakage);
-	printf("Model: %s\n", prefit.Model ? "true" : "false");
+	Set_Analyzer_Prefit_Param_Data(prefit);
 
 	return NO_DCS_ERROR;
 }
 
 static int Process_Get_Analyzer_Prefit() {
 	Analyzer_Prefit_Param data;
+	Get_Analyzer_Prefit_Param_Data(&data);
 
-	//Make fake analyzer prefit data for testing
-	data = (Analyzer_Prefit_Param){
-		.Precut = 1,
-		.PostCut = 2,
-		.Min_Intensity = 1.7F,
-		.Max_Intensity = 2.5F,
-		.FitLimt = 0.65465498498F,
-		.lightLeakage = 7.5,
-		.earlyLeakage = 8.5F,
-		.Model = true,
-	};
-
-	unsigned int to_send_data_size = sizeof(data);
+	const unsigned int to_send_data_size = sizeof(data);
 	char* to_send_data = malloc(to_send_data_size);
 	if (to_send_data == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
@@ -581,6 +751,40 @@ static int Process_Get_Analyzer_Prefit() {
 static int Send_Command_Ack(Data_ID id) {
 	Data_ID networkID = htool(id);
 	return Send_DCS_Data(COMMAND_ACK, (char*) &id, sizeof(id));
+}
+
+int Send_DCS_Message(const char* message) {
+	const size_t message_len = strlen(message);
+
+	const unsigned __int32 to_send_data_size = (unsigned int) message_len + sizeof(to_send_data_size);
+	char* to_send_data = malloc(to_send_data_size);
+	if (to_send_data == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	const unsigned __int32 prependSize = htool((u_long)message_len);
+
+	size_t index = 0;
+
+	memcpy(&to_send_data[index], &prependSize, sizeof(prependSize));
+	index += sizeof(prependSize);
+
+	memcpy(&to_send_data[index], message, message_len);
+	index += message_len;
+
+	return Send_DCS_Data(GET_ERROR_MESSAGE, to_send_data, to_send_data_size);
+}
+
+int Send_DCS_Error(const char* message, unsigned int code) {
+	if (code > 9999) {
+		return 1;
+	}
+
+	char error[100];
+
+	_snprintf_s(error, sizeof(error), _TRUNCATE, "Error (%04u): %s", code, message);
+
+	return Send_DCS_Message(error);
 }
 
 static int Send_DCS_Data(Data_ID data_ID, char* pDataBuf, const unsigned __int32 BufferSize) {

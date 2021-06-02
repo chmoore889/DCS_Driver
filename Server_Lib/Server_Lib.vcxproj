@@ -139,12 +139,16 @@
     </Link>
   </ItemDefinitionGroup>
   <ItemGroup>
+    <ClCompile Include="Data_Gen.c" />
     <ClCompile Include="Internal.c" />
     <ClCompile Include="Server_Lib.c" />
+    <ClCompile Include="Store.c" />
   </ItemGroup>
   <ItemGroup>
+    <ClInclude Include="Data_Gen.h" />
     <ClInclude Include="Internal.h" />
     <ClInclude Include="Server_Lib.h" />
+    <ClInclude Include="Store.h" />
   </ItemGroup>
   <Import Project="$(VCTargetsPath)\Microsoft.Cpp.targets" />
   <ImportGroup Label="ExtensionTargets">

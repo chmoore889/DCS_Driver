@@ -1,4 +1,4 @@
-#pragma once
+﻿#pragma once
 
 #include <stdlib.h>
 #include <stdbool.h>
@@ -59,6 +59,10 @@ host and the remote DCS. GET IDs are for the data from the DCS*/
 #define SET_ANALYZER_PREFIT_PARAM 9
 #define GET_ANALYZER_PREFIT_PARAM 10
 #define SET_OPTICAL_PARAM 11
+#define GET_BFI_DATA 13
+#define GET_CORR_INTENSITY 14
+#define GET_BFI_CORR_READY 15
+#define GET_INTENSITY 16
 #define CHECK_NET_CONNECTION 254
 #define GET_ERROR_MESSAGE 254
 #define STOP_DCS 255
@@ -124,6 +128,25 @@ typedef struct {
 	float musp; // light scattering coefficient (1/cm)
 } Optical_Param_Type;
 
+typedef struct {
+	int Cha_ID; // Channel ID
+	float BFI; // absolute blood flow index
+	float Beta; // β value in the fitting
+	float rMSE; // relative mean square error
+} BFI_Data;
+
+typedef struct {
+	int Cha_ID; //Channel ID
+	float intensity; //intensity of the optical channel
+	int Data_Num; //number of the correlation value
+	float* pCorrBuf; //pointer to the buffer of the correlation values
+} Corr_Intensity_Data;
+
+typedef struct {
+	int Cha_ID; //Channel ID
+	float intensity; //intensity of the optical channel
+} Intensity_Data;
+
 //Frame version of DCS frame is a 16 bit integer.
 typedef unsigned __int16 Frame_Version;
 
@@ -151,3 +174,8 @@ typedef struct Transmission_Data_Type {
 } Transmission_Data_Type;
 
 int Enqueue_Trans_FIFO(Transmission_Data_Type* pTransmission);
+
+int Send_DCS_Message(const char* message);
+int Send_DCS_Error(const char* message, unsigned int code);
+
+int Handle_Measurement(void);
