@@ -177,9 +177,11 @@ static void Listen_And_Handle(void* socket_ptr) {
 
 	while (WaitForSingleObject(hRunMutex, 50) == WAIT_TIMEOUT) {
 		SOCKET ClientSocket = INVALID_SOCKET;
+		struct sockaddr addr;
+		int addr_len = sizeof(addr);
 
 		// Accept a client socket
-		ClientSocket = accept(ListenSocket, NULL, NULL);
+		ClientSocket = accept(ListenSocket, &addr, &addr_len);
 		if (ClientSocket == INVALID_SOCKET) {
 			const int err = WSAGetLastError();
 			if (err == WSAEWOULDBLOCK) {
@@ -192,7 +194,14 @@ static void Listen_And_Handle(void* socket_ptr) {
 			return;
 		}
 		//printf("Connected\n");
-		Add_Log("Connected");
+		struct sockaddr_in* addr_in = (struct sockaddr_in*)&addr;
+		char ipStr[INET_ADDRSTRLEN];
+		inet_ntop(AF_INET, &(addr_in->sin_addr), ipStr, INET_ADDRSTRLEN);
+		unsigned short port = ntohs(addr_in->sin_port);
+		
+		char connectionMessage[50];
+		_snprintf_s(connectionMessage, sizeof(connectionMessage), _TRUNCATE, "Connected to %s:%u", ipStr, port);
+		Add_Log(connectionMessage);
 
 		iResult = make_socket_nonblocking(ClientSocket);
 		if (iResult != NO_ERROR) {
