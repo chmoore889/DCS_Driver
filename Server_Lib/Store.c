@@ -49,6 +49,7 @@ int Set_Correlator_Setting_Data(Correlator_Setting newVal) {
 	release_Store_mutex();
 
 	Send_DCS_Message("Set Correlator Setting Success");
+	Add_Log("Changed Correlator Setting");
 	return NO_DCS_ERROR;
 }
 
@@ -140,6 +141,7 @@ int Set_Analyzer_Setting_Data(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num) 
 	release_Store_mutex();
 
 	Send_DCS_Message("Set Analyzer Setting Success");
+	Add_Log("Changed Analyzer Setting");
 
 	return NO_DCS_ERROR;
 }
@@ -166,6 +168,7 @@ int Set_Optical_Param_Data(Optical_Param_Type* input_arr, int Cha_Num) {
 	release_Store_mutex();
 
 	Send_DCS_Message("Set Optical Param Success");
+	Add_Log("Changed Optical Params");
 
 	return NO_DCS_ERROR;
 }
@@ -198,6 +201,7 @@ int Set_Analyzer_Prefit_Param_Data(Analyzer_Prefit_Param input) {
 	release_Store_mutex();
 
 	Send_DCS_Message("Set Analyzer Prefit Param Success");
+	Add_Log("Changed Analyzer Prefit Params");
 
 	return NO_DCS_ERROR;
 }
@@ -264,6 +268,8 @@ int Start_Measurement(int interval, int Cha_Num, int* ids) {
 
 	release_Store_mutex();
 
+	Add_Log("Starting Measurement");
+
 	return NO_DCS_ERROR;
 }
 
@@ -273,6 +279,8 @@ int Stop_Measurement() {
 	measurement_status.measurement_going = false;
 
 	release_Store_mutex();
+
+	Add_Log("Stopping Measurement");
 
 	return NO_DCS_ERROR;
 }
