@@ -191,7 +191,8 @@ static void Listen_And_Handle(void* socket_ptr) {
 			WSACleanup();
 			return;
 		}
-		printf("Connected\n");
+		//printf("Connected\n");
+		Add_Log("Connected");
 
 		iResult = make_socket_nonblocking(ClientSocket);
 		if (iResult != NO_ERROR) {
@@ -224,6 +225,7 @@ static void Listen_And_Handle(void* socket_ptr) {
 		if (!recv_failed) {
 			break;
 		}
+		Add_Log("Disconnected");
 	}
 
 	//Cleanup

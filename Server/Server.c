@@ -2,9 +2,9 @@
 #include <stdlib.h>
 #include <crtdbg.h>
 #include <stdio.h>
-#include <windows.h>
 
 #include "Server_Lib.h"
+#include "Store.h"
 
 #define DEFAULT_PORT "50000"
 
@@ -17,7 +17,27 @@ int main(void) {
 		return result;
 	}
 
-	Sleep(INFINITE);
+	while (1) {
+		char** message = malloc(sizeof(*message));
+		unsigned __int32* messageLength = malloc(sizeof(*messageLength));
+		result = Get_Logs(message, messageLength);
+		if (result == 0 && message != NULL && messageLength != NULL) {
+			char* toPrint = calloc((size_t)*messageLength + 1, sizeof(*toPrint));
+			if (toPrint == NULL) {
+				free(*message);
+				free(message);
+				free(messageLength);
+				break;
+			}
+
+			memcpy(toPrint, *message, *messageLength);
+
+			printf("%s\n", toPrint);
+			free(*message);
+		}
+		free(message);
+		free(messageLength);
+	}
 
 	return Stop_Server();
 }

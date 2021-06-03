@@ -8,6 +8,9 @@ static HANDLE hStoreMutex;
 static inline void set_Store_mutex(void);
 static inline void release_Store_mutex(void);
 
+static Log* log_head = NULL;
+static Log* log_tail = NULL;
+
 static DCS_Status status = {
 	.bCorr = true,
 	.bAnalyzer = true,
@@ -280,6 +283,73 @@ int Get_Measurement_Status(Measurement_Status* status) {
 	*status = measurement_status;
 
 	release_Store_mutex();
+
+	return NO_DCS_ERROR;
+}
+
+int Add_Log(const char* log) {
+	unsigned __int32 size = (unsigned __int32) strlen(log);
+	char* str = malloc(size);
+	if (str == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+	memcpy(str, log, size);
+
+	Log* pLog = malloc(sizeof(*pLog));
+	if (pLog == NULL) {
+		free(str);
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	*pLog = (Log) {
+		.pNextItem = NULL,
+		.size = size,
+		.str = str,
+	};
+
+	set_Store_mutex();
+
+	//If FIFO is empty, this element is both the head and tail.
+	if (log_head == NULL) {
+		log_head = pLog;
+		log_tail = pLog;
+	}
+	//Otherwise, add to the end of FIFO.
+	else {
+		log_tail->pNextItem = pLog;
+		log_tail = pLog;
+	}
+
+	release_Store_mutex();
+
+	return NO_DCS_ERROR;
+}
+
+int Get_Logs(char** pMessage, unsigned __int32* length) {
+	set_Store_mutex();
+
+	Log* pLog = log_head;
+
+	//If the original FIFO head isn't null, shift the queue.
+	if (pLog != NULL) {
+		log_head = log_head->pNextItem;
+	}
+
+	//If the new FIFO head is null, the queue is empty.
+	if (log_head == NULL) {
+		log_tail = NULL;
+	}
+
+	release_Store_mutex();
+
+	if (pLog == NULL) {
+		return 1;
+	}
+
+	*pMessage = pLog->str;
+	*length = pLog->size;
+
+	free(pLog);
 
 	return NO_DCS_ERROR;
 }
