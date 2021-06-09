@@ -8,6 +8,12 @@ static HANDLE hStoreMutex;
 static inline void set_Store_mutex(void);
 static inline void release_Store_mutex(void);
 
+typedef struct Log {
+	unsigned __int32 size; //Size of log string
+	char* str; //Non-null-terminated log string
+	struct Log* pNextItem; //Pointer to the next item in the queue.
+} Log;
+
 static Log* log_head = NULL;
 static Log* log_tail = NULL;
 
