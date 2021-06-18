@@ -1,6 +1,5 @@
 ﻿#pragma once
 
-#include <stdlib.h>
 #include <stdbool.h>
 #include <WinSock2.h>
 
@@ -63,6 +62,7 @@ host and the remote DCS. GET IDs are for the data from the DCS*/
 #define GET_CORR_INTENSITY 14
 #define GET_BFI_CORR_READY 15
 #define GET_INTENSITY 16
+#define GET_ERROR_ID 253
 #define CHECK_NET_CONNECTION 254
 #define GET_ERROR_MESSAGE 254
 #define STOP_DCS 255

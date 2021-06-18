@@ -772,13 +772,25 @@ int Send_DCS_Message(const char* message) {
 	memcpy(&to_send_data[index], message, message_len);
 	index += message_len;
 
-	return Send_DCS_Data(GET_ERROR_MESSAGE, to_send_data, to_send_data_size);
+	int iResult = Send_DCS_Data(GET_ERROR_MESSAGE, to_send_data, to_send_data_size);
+	free(to_send_data);
+
+	return iResult;
 }
 
-int Send_DCS_Error(const char* message, unsigned int code) {
+int Send_Error_code(unsigned __int32 code) {
+	unsigned __int32 netCode;
+	netCode = htool(code);
+
+	return Send_DCS_Data(GET_ERROR_ID, (char*) &netCode, sizeof(netCode));
+}
+
+int Send_DCS_Error(const char* message, unsigned __int32 code) {
 	if (code > 9999) {
 		return 1;
 	}
+
+	Send_Error_code(code);
 
 	char error[100];
 

@@ -1,4 +1,6 @@
+#define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
+#include <crtdbg.h>
 #include <stdio.h>
 #include <stdbool.h>
 #include <winsock2.h>
@@ -143,6 +145,7 @@ int Start_Server(const char* port) {
 
 int Stop_Server(void) {
 	clear_Trans_FIFO();
+	Cleanup_Logs();
 
 	//If the COM task isn't already stopped, free all the task's resources.
 	if (hRunMutex != NULL) {

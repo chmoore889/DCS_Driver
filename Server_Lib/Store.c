@@ -1,3 +1,7 @@
+#define _CRTDBG_MAP_ALLOC
+#include <stdlib.h>
+#include <crtdbg.h>
+
 #include "Store.h"
 #include "Internal.h"
 #include "Server_Lib.h"
@@ -366,6 +370,34 @@ int Get_Logs(char** pMessage, unsigned __int32* length) {
 	free(pLog);
 
 	return NO_DCS_ERROR;
+}
+
+void Cleanup_Logs(void) {
+	char** message = malloc(sizeof(*message));
+	if (message == NULL) {
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	unsigned __int32* messageLength = malloc(sizeof(*messageLength));
+	if (messageLength == NULL) {
+		free(message);
+		return MEMORY_ALLOCATION_ERROR;
+	}
+
+	int result;
+
+	while(1) {
+		result = Get_Logs(message, messageLength);
+		if (result == 0) {
+			free(*message);
+		}
+		else {
+			break;
+		}
+	}
+
+	free(message);
+	free(messageLength);
 }
 
 int init_Store() {

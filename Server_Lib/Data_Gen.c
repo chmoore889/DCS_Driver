@@ -1,5 +1,7 @@
 #define _CRT_RAND_S
+#define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
+#include <crtdbg.h>
 
 #include "Server_Lib.h"
 #include "Data_Gen.h"

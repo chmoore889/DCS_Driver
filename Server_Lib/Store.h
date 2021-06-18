@@ -40,6 +40,7 @@ int Stop_Measurement(void);
 /// <param name="log">The string to log.</param>
 /// <returns>Standard DCS return code.</returns>
 int Add_Log(const char* log);
+void Cleanup_Logs(void);
 
 __declspec(dllexport) int Get_DCS_Status_Data(DCS_Status* output);
 __declspec(dllexport) int Get_Correlator_Setting_Data(Correlator_Setting* output);
