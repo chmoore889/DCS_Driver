@@ -1,6 +1,7 @@
 #define _CRTDBG_MAP_ALLOC
 #include <stdlib.h>
 #include <crtdbg.h>
+#include <stdio.h>
 
 #include "Store.h"
 #include "Internal.h"
@@ -52,6 +53,28 @@ int Get_Correlator_Setting_Data(Correlator_Setting* output) {
 }
 
 int Set_Correlator_Setting_Data(Correlator_Setting newVal) {
+	const unsigned int errCode = 5104;
+	char errStr[60] = "Correlator setting error: ";
+
+#pragma warning (disable: 6001)
+	// Parameter validation
+	if (newVal.Data_N != 16384 && newVal.Data_N != 32768) {
+		strcat_s(errStr, sizeof(errStr), "Invalid data size.");
+
+		return Send_DCS_Error(errStr, errCode);
+	}
+	if (newVal.Scale < 2 || newVal.Scale > 10) {
+		strcat_s(errStr, sizeof(errStr), "Invalid scale.");
+
+		return Send_DCS_Error(errStr, errCode);
+	}
+	if (newVal.Corr_Time <= 0) {
+		strcat_s(errStr, sizeof(errStr), "Invalid sample number.");
+
+		return Send_DCS_Error(errStr, errCode);
+	}
+#pragma warning (default: 6001)
+
 	set_Store_mutex();
 
 	corr_setting = newVal;
@@ -138,13 +161,42 @@ int Get_Analyzer_Setting_Data(Analyzer_Setting** pAnalyzer_Setting, int* Cha_Num
 }
 
 int Set_Analyzer_Setting_Data(Analyzer_Setting* pAnalyzer_Setting, int Cha_Num) {
-	set_Store_mutex();
+	const unsigned int errCode = 5104;
 
 	if (sizeof(analyzer_setting) != sizeof(*pAnalyzer_Setting) * Cha_Num) {
-		release_Store_mutex();
-		Send_DCS_Error("Incorrect number of channels in analyzer set command", 5104);
-		return 1;
+		return Send_DCS_Error("Incorrect number of channels in analyzer set command.", errCode);
 	}
+
+	// Parameter validation.
+	for (int x = 0; x < Cha_Num; x++) {
+		char errStr[120];
+		_snprintf_s(errStr, sizeof(errStr), _TRUNCATE, "Analyzer configuration error in detector %d.", x);
+
+		Analyzer_Setting setting = pAnalyzer_Setting[x];
+		if (setting.Db < 0.0f || setting.Db > 1E-7f || setting.Beta < 0.0f || setting.Beta > 2.0f || setting.Alpha < 0.0f || setting.Alpha > 1.0f) {
+			strcat_s(errStr, sizeof(errStr), " Invalid Beta, Db or error threshold.");
+
+			return Send_DCS_Error(errStr, errCode);
+		}
+
+		if (setting.musp < 1.0f || setting.musp > 30.0f) {
+			strcat_s(errStr, sizeof(errStr), " Invalid light scattering coefficient.");
+
+			return Send_DCS_Error(errStr, errCode);
+		}
+
+		if (setting.mua0 < 0.01f || setting.mua0 > 3.0f) {
+			strcat_s(errStr, sizeof(errStr), " Invalid light absorption coefficient.");
+
+			return Send_DCS_Error(errStr, errCode);
+		}
+
+		if (setting.Wavelength < 200.0f || setting.Wavelength > 1000.0f) {
+			return Send_DCS_Error(errStr, errCode);
+		}
+	}
+
+	set_Store_mutex();
 
 	memcpy(analyzer_setting, pAnalyzer_Setting, sizeof(analyzer_setting));
 
@@ -166,21 +218,17 @@ int Set_Optical_Param_Data(Optical_Param_Type* input_arr, int Cha_Num) {
 		}
 	}
 
-	set_Store_mutex();
+	Analyzer_Setting settingsCopy[sizeof(analyzer_setting) / sizeof(*analyzer_setting)];
+	memcpy(settingsCopy, analyzer_setting, sizeof(settingsCopy));
 
 	for (int x = 0; x < Cha_Num; x++) {
-		Analyzer_Setting* chaToChange = &analyzer_setting[input_arr[x].Cha_ID];
+		Analyzer_Setting* chaToChange = &settingsCopy[input_arr[x].Cha_ID];
 
 		chaToChange->mua0 = input_arr[x].mua0;
 		chaToChange->musp = input_arr[x].musp;
 	}
 
-	release_Store_mutex();
-
-	Send_DCS_Message("Set Optical Param Success");
-	Add_Log("Changed Optical Params");
-
-	return NO_DCS_ERROR;
+	return Set_Analyzer_Setting_Data(settingsCopy, sizeof(settingsCopy) / sizeof(*settingsCopy));
 }
 
 static Analyzer_Prefit_Param analyzer_prefit = {
@@ -250,26 +298,37 @@ static Measurement_Status measurement_status = {
 };
 
 int Start_Measurement(int interval, int Cha_Num, int* ids) {
-	set_Store_mutex();
+	const unsigned int errCode = 5106;
+	char errStr[65] = "Measurement parameters error: ";
 
-	if (Cha_Num > 2) {
-		release_Store_mutex();
-		Send_DCS_Error("Too many channel IDs", 5106);
+#pragma warning (disable: 6001)
+	// Parameter validation
+	if (Cha_Num > NUM_CHANNELS) {
+		strcat_s(errStr, sizeof(errStr), "Too many channel IDs.");
+		Send_DCS_Error(errStr, errCode);
 		return 1;
-	} 
-	else if (interval <= 0) {
-		release_Store_mutex();
-		Send_DCS_Error("Interval cannot be 0", 5107);
+	}
+	if (Cha_Num <= 0) {
+		strcat_s(errStr, sizeof(errStr), "Missing channel IDs.");
+		Send_DCS_Error(errStr, errCode);
+		return 1;
+	}
+	if (interval <= 0) {
+		strcat_s(errStr, sizeof(errStr), "Invalid scan interval.");
+		Send_DCS_Error(errStr, errCode);
 		return 1;
 	}
 
 	for (int x = 0; x < Cha_Num; x++) {
-		if (ids[x] >= NUM_CHANNELS) {
-			release_Store_mutex();
-			Send_DCS_Error("Invalid channel ID", 5108);
+		if (ids[x] >= NUM_CHANNELS || ids[x] < 0) {
+			strcat_s(errStr, sizeof(errStr), "Invalid channel ID.");
+			Send_DCS_Error(errStr, errCode);
 			return 1;
 		}
 	}
+#pragma warning (default: 6001)
+
+	set_Store_mutex();
 
 	measurement_status.measurement_going = true;
 	measurement_status.interval = interval;
@@ -372,7 +431,7 @@ int Get_Logs(char** pMessage, unsigned __int32* length) {
 	return NO_DCS_ERROR;
 }
 
-void Cleanup_Logs(void) {
+int Cleanup_Logs(void) {
 	char** message = malloc(sizeof(*message));
 	if (message == NULL) {
 		return MEMORY_ALLOCATION_ERROR;
@@ -398,6 +457,7 @@ void Cleanup_Logs(void) {
 
 	free(message);
 	free(messageLength);
+	return NO_DCS_ERROR;
 }
 
 int init_Store() {
